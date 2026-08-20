@@ -1,0 +1,115 @@
+/* ==================================================================
+   NOWHERE CENTRAL — design DNA
+   Adjectives: mechanical, sodium-lit, patient, slightly wrong.
+   Dark-first. Every component reads semantic tokens only.
+   ================================================================== */
+
+:root {
+  /* ---- primitives ------------------------------------------------ */
+  --ink-1000: #05070a;
+  --ink-950: #080b10;
+  --ink-900: #0c1017;
+  --ink-850: #11161f;
+  --ink-800: #171d27;
+  --ink-700: #202834;
+  --ink-600: #2c3644;
+
+  --bone-100: #f2efe6;
+  --bone-200: #ddd8ca;
+  --bone-300: #b9b3a3;
+  --bone-400: #8b8778;
+
+  --sodium-400: #ffb347; /* platform lamp */
+  --sodium-500: #ff9a1f;
+  --sodium-600: #e07a0c;
+
+  --signal-green: #6fe3a0;
+  --signal-red: #ff5b53;
+  --petrol-400: #4fa8b8;
+
+  /* ---- semantic roles -------------------------------------------- */
+  --bg: var(--ink-1000);
+  --surface: var(--ink-900);
+  --surface-2: var(--ink-850);
+  --text: var(--bone-100);
+  --text-muted: var(--bone-400);
+  --text-dim: #5d6470;
+
+  --accent: var(--sodium-400);
+  --accent-strong: var(--sodium-500);
+  --accent-ghost: rgba(255, 179, 71, 0.12);
+
+  --ok: var(--signal-green);
+  --warn: var(--sodium-400);
+  --bad: var(--signal-red);
+
+  --border: rgba(242, 239, 230, 0.09);
+  --border-strong: rgba(242, 239, 230, 0.2);
+  --focus: var(--sodium-400);
+
+  /* split-flap hardware */
+  --flap-bg: #14181f;
+  --flap-bg-hi: #1b212a;
+  --flap-ink: var(--bone-100);
+  --flap-seam: rgba(0, 0, 0, 0.85);
+
+  /* ---- type ------------------------------------------------------ */
+  --font-display: 'Bodoni Moda', 'Didot', 'Times New Roman', serif;
+  --font-ui: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --fs-2xs: 0.625rem;
+  --fs-xs: 0.72rem;
+  --fs-sm: 0.82rem;
+  --fs-base: 0.95rem;
+  --fs-lg: 1.15rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: clamp(1.9rem, 3.4vw, 2.75rem);
+  --fs-3xl: clamp(2.6rem, 6vw, 5rem);
+  --fs-mega: clamp(3.2rem, 12.5vw, 12rem);
+
+  --tracking-wide: 0.18em;
+  --tracking-wider: 0.34em;
+
+  /* ---- space (4px base) ------------------------------------------ */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+  --sp-9: 96px;
+  --sp-10: 140px;
+
+  --gutter: clamp(20px, 5vw, 72px);
+  --measure: 62ch;
+
+  /* ---- shape ----------------------------------------------------- */
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 10px;
+  --r-lg: 18px;
+  --r-full: 999px;
+
+  /* ---- elevation (dark UI: glow + hairline, not drop shadow) ----- */
+  --e-1: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.9);
+  --e-2: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 24px 60px -24px rgba(0, 0, 0, 1);
+  --e-lamp: 0 0 0 1px rgba(255, 179, 71, 0.25), 0 0 32px -6px rgba(255, 179, 71, 0.35);
+
+  /* ---- motion ----------------------------------------------------- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --d-micro: 120ms;
+  --d-fast: 200ms;
+  --d-med: 340ms;
+  --d-slow: 560ms;
+
+  /* split-flap cell geometry */
+  --flap-w: clamp(13px, 1.55vw, 26px);
+  --flap-h: clamp(20px, 2.4vw, 40px);
+  --flap-gap: 2px;
+}
