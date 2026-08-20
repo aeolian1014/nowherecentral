@@ -129,16 +129,29 @@ that range you hear the valley more than the engine.
   slow attack because steam takes a moment to find the pipes, and a
   band of breath noise around the tone. Without the breath it is an
   organ.
-- **Bell** — brass, so inharmonic partials at 1, 2.01, 3.04, 4.19, 5.51
-  with the upper ones dying first. It swings, so alternate strikes fall
-  0.60s and 0.70s apart at slightly different strengths.
+- **Bell** — a small hand bell, not a church tower. This one is easy to
+  get wrong: a low fundamental with strong clangorous partials (2.01,
+  3.04, 4.19, 5.51) ringing for two or three seconds under reverb is
+  exactly how you synthesise a bell tolling in an empty church, and it
+  sounds haunted. A locomotive bell is bright (~1050 Hz), its partials
+  sit near plain octaves and fifths, everything above the fundamental
+  is gone inside half a second, and there is a clapper tick on the
+  attack — without which it is a synth tone rather than metal.
 
-The whole pass runs about three quarters of a minute, and it happens
-**every two and a half to five minutes**, not continuously. The concourse
-shader sweeps light across the floor every 22 seconds; most of those pass
-in silence — whatever it is, it's too far to hear. Occasionally one is
-close enough, and the sound is aimed at that exact sweep so the light and
-the steam arrive together.
+The first train comes **10 seconds** after the concourse opens, and after
+that there is roughly **half a minute of quiet** between one pass and the
+next. The concourse shader sweeps light across the floor every 22
+seconds, and each pass is aimed at one of those sweeps, so the light
+crossing the floor and the engine going through are the same event.
+
+Distance is a gentle falloff rather than a literal inverse square. True
+1/r² spends most of a pass inaudible, which reads as a short event
+surrounded by silence instead of a train crossing a valley. The ambience
+bus ducks about 40% underneath it too — a real distant train doesn't get
+louder than the wind so much as take the wind's place for a minute.
+
+Measured at the output: ambience sits at 0.059 RMS, the pass peaks at
+0.252 — a little over four times the room, at its closest.
 
 Voices are scheduled about two and a half seconds ahead on a rolling
 timer rather than all at once, so a forty-second pass never holds more

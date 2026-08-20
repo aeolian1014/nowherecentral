@@ -339,10 +339,13 @@ body.no-gl {
 
 .hero-title {
   font-family: var(--font-display);
-  /* Keeping the optical size around a text cut preserves the Didone
-     thick/thin drama; the weight is what puts the hairlines back. */
-  --display-opsz: 16;
-  --display-wght: 600;
+  /* A Didone's hairline is the first thing to go on a dark ground.
+     High opsz = the display cut = maximum thick/thin drama and the
+     finest hairline; weight is what puts thickness back without
+     flattening the contrast. This pair is the dial — try values with
+     NC.type(opsz, wght) in the console and keep the ones you like. */
+  --display-opsz: 58;
+  --display-wght: 470;
   font-size: var(--fs-mega);
   line-height: 0.84;
   letter-spacing: -0.02em;
@@ -356,11 +359,11 @@ body.no-gl {
 }
 .hero-title .ln:nth-child(2) > span { transition-delay: 90ms; }
 .ready .hero-title .ln > span { transform: none; }
-/* the italic is cut finer still, so it gets more weight again */
+/* the italic is cut finer still, so it gets a little more weight again */
 .hero-title em {
   font-style: italic;
   color: var(--accent);
-  --display-wght: 600;
+  --display-wght: 500;
 }
 
 .hero-sub {

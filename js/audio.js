@@ -595,24 +595,54 @@ export class Station {
     src.stop(when + 0.45);
   }
 
-  /** the brass bell on the boiler — inharmonic, and it swings */
+  /**
+   * The brass bell on the boiler.
+   *
+   * This is a small hand bell, not a church tower. Get that wrong and
+   * it turns funereal immediately: a low fundamental with strong
+   * clangorous partials (2.01, 3.04, 4.19, 5.51) ringing for two or
+   * three seconds under reverb is exactly a tolling bell in an empty
+   * church. A locomotive bell is bright, its partials are close to
+   * plain octaves, and everything above the fundamental is gone inside
+   * half a second — which is what makes it read as cheerful.
+   */
   _locoBell(when, strength) {
     const ctx = this.ctx;
-    const f = rand(540, 660);
-    const parts = [[1, 1], [2.01, 0.46], [3.04, 0.26], [4.19, 0.14], [5.51, 0.07]];
-    for (const [r, a] of parts) {
+    const f = rand(950, 1130);
+    // [ratio, level, decay]
+    const parts = [
+      [1.0, 1.0, 0.90],
+      [2.0, 0.32, 0.40],
+      [2.99, 0.10, 0.15],
+      [4.05, 0.04, 0.09],
+    ];
+    for (const [r, a, decay] of parts) {
       const o = ctx.createOscillator();
       o.type = 'sine';
-      o.frequency.value = f * r * rand(0.996, 1.004);
+      o.frequency.value = f * r * rand(0.999, 1.001);
       const g = ctx.createGain();
-      const decay = 2.6 / Math.pow(r, 0.7);       // upper partials die first
       g.gain.setValueAtTime(0.0001, when);
-      g.gain.linearRampToValueAtTime(strength * a, when + 0.006);
+      g.gain.linearRampToValueAtTime(strength * a, when + 0.004);
       g.gain.exponentialRampToValueAtTime(0.0001, when + decay);
       o.connect(g).connect(this._trainBus);
       o.start(when);
       o.stop(when + decay + 0.05);
     }
+
+    // the clapper itself — a physical tick, or it is a synth tone
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = rand(0.9, 1.2);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = f * 2.1;
+    bp.Q.value = 0.7;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(strength * 0.45, when);
+    cg.gain.exponentialRampToValueAtTime(0.0001, when + 0.022);
+    src.connect(bp).connect(cg).connect(this._trainBus);
+    src.start(when, Math.random() * 2);
+    src.stop(when + 0.06);
   }
 
   /** a multi-chime whistle: several pipes, a minor stack, and breath */
@@ -624,8 +654,8 @@ export class Station {
     const out = ctx.createGain();
     out.gain.setValueAtTime(0.0001, when);
     // steam takes a moment to find the pipes
-    out.gain.exponentialRampToValueAtTime(0.085, when + rand(0.3, 0.55));
-    out.gain.setValueAtTime(0.085, when + dur * 0.7);
+    out.gain.exponentialRampToValueAtTime(0.26, when + rand(0.3, 0.55));
+    out.gain.setValueAtTime(0.26, when + dur * 0.7);
     out.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     out.connect(this._trainBus);
 
@@ -695,27 +725,49 @@ export class Station {
     lvl.gain.value = 0.0001;
 
     bus.connect(air).connect(lvl);
-    lvl.connect(this.bus);
+    // straight to the master, past the ambience bus, so the ambience can
+    // be ducked underneath it without ducking the train as well
+    lvl.connect(this.master);
     const send = ctx.createGain();
     send.gain.value = 0.55 + far * 0.4;            // far away is mostly reverb
     lvl.connect(send).connect(this.hall);
 
     this._trainBus = bus;
 
-    /* ---- distance envelope: inverse square, not a fade ---- */
+    /* ---- distance envelope ----
+       A gentle falloff, not a literal inverse square. True 1/r² spends
+       most of the pass inaudible, which reads as a short event with a
+       long silence around it rather than as a train crossing a valley.
+       The filter has to open properly too: at a 500 Hz ceiling the
+       exhaust has nowhere to live and the whistle becomes a hum.      */
     const N = 160;
     const level = new Float32Array(N);
     const cutoff = new Float32Array(N);
-    const top = 0.30 * (1 - far * 0.62);
+    const top = 0.92 * (1 - far * 0.30);
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1);
       const d = Math.abs(t - 0.5) * 2;             // 0 at the pass, 1 at the ends
-      const near = 1 / (1 + 11 * d * d);
+      const near = 1 / (1 + 4.2 * d * d);
       level[i] = Math.max(0.0001, top * near);
-      cutoff[i] = 240 + (1 - far) * 700 + near * (620 + (1 - far) * 2100);
+      cutoff[i] = 420 + (1 - far) * 900 + near * (1500 + (1 - far) * 2800);
     }
     lvl.gain.setValueCurveAtTime(level, t0, dur);
     air.frequency.setValueCurveAtTime(cutoff, t0, dur);
+
+    /* Duck the room under it. A real distant train doesn't get louder
+       than the wind so much as it takes the wind's place for a minute. */
+    const floor = 1 / (1 + 4.2);
+    const duck = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const d = Math.abs(t - 0.5) * 2;
+      const near = 1 / (1 + 4.2 * d * d);
+      duck[i] = 1 - 0.42 * Math.max(0, (near - floor) / (1 - floor));
+    }
+    try {
+      this.bus.gain.cancelScheduledValues(t0);
+      this.bus.gain.setValueCurveAtTime(duck, t0, dur);
+    } catch (e) {}
 
     /* ---- the rumble underneath ---- */
     const rum = ctx.createBufferSource();
@@ -726,7 +778,7 @@ export class Station {
     rlp.frequency.value = 150;
     rlp.Q.value = 1.2;
     const rg = ctx.createGain();
-    rg.gain.value = 0.55;
+    rg.gain.value = 0.8;
     rum.connect(rlp).connect(rg).connect(bus);
     rum.start(t0, Math.random() * 2);
     rum.stop(tEnd + 0.5);
@@ -756,15 +808,16 @@ export class Station {
 
       while (nextRev <= tEnd && nextRev + beats[beat] * revolution < horizon) {
         const at = nextRev + beats[beat] * revolution;
-        if (at > t0) this._chuff(at, 0.16 * punch[beat] * rand(0.88, 1.12));
+        if (at > t0) this._chuff(at, 0.34 * punch[beat] * rand(0.88, 1.12));
         beat++;
         if (beat === 4) { beat = 0; nextRev += revolution; }
       }
 
       while (nextBell < horizon && nextBell < bellTo) {
-        this._locoBell(nextBell, 0.05 * (bellSwing % 2 ? 0.78 : 1));
-        // a swinging bell is never quite even
-        nextBell += bellSwing % 2 ? 0.70 : 0.60;
+        this._locoBell(nextBell, 0.16 * (bellSwing % 2 ? 0.92 : 1));
+        // briskly rung, with just enough unevenness to be a hand and
+        // not a metronome. Slow it down and it becomes a toll again.
+        nextBell += bellSwing % 2 ? 0.46 : 0.42;
         bellSwing++;
       }
 
@@ -772,7 +825,11 @@ export class Station {
         clearInterval(this._train);
         this._train = null;
         this._trainBus = null;
-        try { bus.disconnect(); lvl.disconnect(); send.disconnect(); } catch (e) {}
+        try {
+          this.bus.gain.cancelScheduledValues(now);
+          this.bus.gain.setTargetAtTime(1, now, 0.4);
+          bus.disconnect(); lvl.disconnect(); send.disconnect();
+        } catch (e) {}
       }
     }, 450);
   }

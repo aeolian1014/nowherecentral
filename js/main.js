@@ -665,26 +665,31 @@ function nightWiring() {
    sweep the light will make, so they arrive together.
    ================================================================ */
 const SWEEP_PERIOD = 1 / 0.0455;
-const FIRST_TRAIN = [50000, 95000];      // ms after entering
-const THEN_EVERY = [150000, 300000];     // two and a half to five minutes
+const FIRST_TRAIN = 10000;               // ms after the concourse opens
+const QUIET_BETWEEN = [26000, 38000];    // silence between one pass and the next
 
 function trainWatch() {
-  let due = performance.now() + rnd(...FIRST_TRAIN);
+  let due = 0;
+  let armed = false;
 
   setInterval(() => {
     if (!entered || !gl.ok || !station.enabled) return;
+    if (!armed) { armed = true; due = performance.now() + FIRST_TRAIN; }
     if (gl.current !== 'concourse' || document.hidden || inTransit) return;
     if (performance.now() < due) return;
-    due = performance.now() + rnd(...THEN_EVERY);
 
-    /* Aim the closest approach at a sweep peak. The shader's cycle is
-       fract(uTime * 0.0455) and the light crosses at the half. */
+    /* Aim the closest approach at a sweep peak, so the light crossing
+       the concourse floor and the engine going through are the same
+       event. The shader's cycle is fract(uTime * 0.0455). */
     const now = gl.time;
-    const k = Math.ceil((now + 19 - SWEEP_PERIOD * 0.5) / SWEEP_PERIOD);
+    const k = Math.ceil((now + 17 - SWEEP_PERIOD * 0.5) / SWEEP_PERIOD);
     const peakIn = k * SWEEP_PERIOD + SWEEP_PERIOD * 0.5 - now;
 
-    station.steamTrain({ peak: peakIn, far: 0.74 + Math.random() * 0.2 });
-  }, 1000);
+    station.steamTrain({ peak: peakIn, far: 0.5 + Math.random() * 0.22 });
+
+    // next one starts a short quiet after this one has gone
+    due = performance.now() + peakIn * 2000 + rnd(...QUIET_BETWEEN);
+  }, 500);
 }
 
 /* ================================================================
@@ -751,7 +756,37 @@ function init() {
   });
 
   // signalbox: for anyone who opens the console
-  window.NC = { gl, station, rows, night, go: depart_to, home: returnHome, sleep: toggleNight };
+  window.NC = {
+    gl, station, rows, night,
+    go: depart_to,
+    home: returnHome,
+    sleep: toggleNight,
+    /** NC.train() — hear one now, without waiting. NC.train(0.2) = close. */
+    train: (far = 0.6) => station.steamTrain({ peak: 18, far }),
+    /**
+     * NC.type(opsz, wght) — dial the display serif live and see it on
+     * your own screen. opsz 96 is the thinnest, most dramatic cut; lower
+     * is sturdier. wght 400–700 thickens the hairline without flattening
+     * the contrast. Call with no arguments to read the current pair.
+     */
+    type: (opsz, wght) => {
+      const r = document.documentElement.style;
+      if (opsz === undefined) {
+        const c = getComputedStyle(document.documentElement);
+        return {
+          opsz: +c.getPropertyValue('--display-opsz'),
+          wght: +c.getPropertyValue('--display-wght'),
+        };
+      }
+      r.setProperty('--display-opsz', String(opsz));
+      if (wght !== undefined) r.setProperty('--display-wght', String(wght));
+      $$('.hero-title, .hero-title em').forEach((el) => {
+        el.style.removeProperty('--display-opsz');
+        el.style.removeProperty('--display-wght');
+      });
+      return `opsz ${opsz} / wght ${wght ?? 'unchanged'}`;
+    },
+  };
 
   boot();
 }
