@@ -151,15 +151,61 @@ export const STATUSES = [
   'HELD',
 ];
 
+/* [reference, what it is, what the clerk says when you pick it up]
+   The third line is the doorway: each object is an excuse to ask you
+   what you are still holding on to at one in the morning. */
 export const LOST_AND_FOUND = [
-  ['UMB-0041', 'One (1) umbrella. Black. Unopened. Bone dry.'],
-  ['GLV-0118', 'A single glove. Right hand. Still warm.'],
-  ['TUE-4207', 'Four point two hours of somebody’s Tuesday.'],
-  ['KEY-0003', 'A key to a door demolished in 1974.'],
-  ['SNG-0862', 'The last verse of a song you almost remember.'],
-  ['NAM-0001', 'One (1) name. No longer attached to anyone.'],
-  ['PHT-5510', 'A photograph. Everyone in it is looking slightly left.'],
-  ['TKT-∞', 'A return ticket. Undated. Unused. Unrefundable.'],
+  [
+    'UMB-0041',
+    'One (1) umbrella. Black. Unopened. Bone dry.',
+    'Carried every day for a year against rain that never came. Most of what we hold is like this.',
+  ],
+  [
+    'GLV-0118',
+    'A single glove. Right hand. Still warm.',
+    'Its pair is not here and is not coming. Some things are only ever going to be one of two.',
+  ],
+  [
+    'TUE-4207',
+    'Four point two hours of somebody’s Tuesday.',
+    'Handed in at midnight, unspent. Nobody has come back for them, and nobody ever does.',
+  ],
+  [
+    'KEY-0003',
+    'A key to a door demolished in 1974.',
+    'It still turns. There is simply nothing left for it to turn in. You can put it down.',
+  ],
+  [
+    'SNG-0862',
+    'The last verse of a song you almost remember.',
+    'Chasing it will keep you awake until four. Leave it with us and it will come to you on its own.',
+  ],
+  [
+    'NAM-0001',
+    'One (1) name. No longer attached to anyone.',
+    'Said aloud once too often, and then not at all. We will keep saying it so you do not have to.',
+  ],
+  [
+    'PHT-5510',
+    'A photograph. Everyone in it is looking slightly left.',
+    'At something outside the frame that none of them can remember now. Neither can you. That is allowed.',
+  ],
+  [
+    'TKT-∞',
+    'A return ticket. Undated. Unused. Unrefundable.',
+    'Kept in case. It has never once been needed. It is very heavy for a piece of card.',
+  ],
+];
+
+/* Rotated on the deposit slip, so the counter never asks twice the
+   same way. Cognitive offloading before sleep is a real technique;
+   this is only the station's way of phrasing it. */
+export const COUNTER_PROMPTS = [
+  'What are you still carrying?',
+  'What is it you keep picking back up?',
+  'What would you rather not take to bed with you?',
+  'What is still open that could be closed until morning?',
+  'What are you turning over that will not turn any further tonight?',
 ];
 
 export const NOTICES = [

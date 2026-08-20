@@ -2,7 +2,7 @@
    NOWHERE CENTRAL — conductor
 ------------------------------------------------------------------ */
 
-import { DESTINATIONS, STATUSES, LOST_AND_FOUND, NOTICES } from './data.js';
+import { DESTINATIONS, STATUSES, LOST_AND_FOUND, NOTICES, COUNTER_PROMPTS } from './data.js';
 import { FlapLine } from './board.js';
 import { Renderer } from './gl.js';
 import { Station } from './audio.js';
@@ -426,19 +426,189 @@ function notices() {
   }, 9000);
 }
 
+/* ================================================================
+   The counter
+
+   The lost property list was decoration that looked interactive. It
+   is now the one part of this station that is actually of use.
+
+   Writing down what is on your mind before bed — cognitive
+   offloading, or "constructive worry" — measurably shortens how long
+   it takes to fall asleep: a mind stops rehearsing something once it
+   trusts that something else is holding it. So the counter takes it,
+   gives it a reference, and keeps it until morning.
+
+   It never leaves the device. There is no server to send it to.
+   ================================================================ */
+
+const HELD_KEY = 'nc-counter';
+
+function held() {
+  try { return JSON.parse(localStorage.getItem(HELD_KEY) || '[]'); } catch (e) { return []; }
+}
+function saveHeld(list) {
+  try { localStorage.setItem(HELD_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+/** The reference comes out of what you left, the way a real one would. */
+function makeRef(text) {
+  const word = (text.trim().split(/\s+/)[0] || 'ITM').replace(/[^a-z]/gi, '').toUpperCase();
+  return (word + 'XXX').slice(0, 3) + '-' + Math.floor(1000 + Math.random() * 9000);
+}
+
+function heldSince(ts) {
+  const then = new Date(ts);
+  const now = new Date();
+  if (then.toDateString() === now.toDateString()) {
+    const p = (v) => String(v).padStart(2, '0');
+    return `Held since ${p(then.getHours())}:${p(then.getMinutes())}`;
+  }
+  const days = Math.floor((now - then) / 86400000);
+  if (days <= 1) return 'Held since yesterday';
+  if (days < 7) return `Held ${days} days`;
+  return `Held since ${then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+}
+
 let lfBuilt = false;
 function lostAndFound() {
   if (lfBuilt) return;
   lfBuilt = true;
   const ul = $('#lf-list');
   const frag = document.createDocumentFragment();
-  LOST_AND_FOUND.forEach(([ref, desc]) => {
+  LOST_AND_FOUND.forEach(([ref, desc, note]) => {
     const li = document.createElement('li');
-    li.className = 'lf-row';
-    li.innerHTML = `<span class="ref">${ref}</span><span class="desc">${desc}</span><span class="arrow">↗</span>`;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'lf-row';
+    b.setAttribute('aria-label', desc + ' — pick it up');
+    b.innerHTML = '<span class="ref"></span><span class="desc"></span><span class="arrow">↗</span>';
+    $('.ref', b).textContent = ref;
+    $('.desc', b).textContent = desc;
+    b.addEventListener('click', () => openCounter({ ref, desc, note }));
+    li.appendChild(b);
     frag.appendChild(li);
   });
   ul.appendChild(frag);
+  renderHeld();
+}
+
+function renderHeld() {
+  const wrap = $('#lf-held-wrap');
+  const ul = $('#lf-held');
+  if (!wrap || !ul) return;
+  const list = held();
+  wrap.hidden = list.length === 0;
+  $('#lf-held-n').textContent = list.length ? list.length + (list.length > 1 ? ' items' : ' item') : '';
+  ul.textContent = '';
+  list.slice().reverse().forEach((item) => {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'lf-row';
+    b.setAttribute('aria-label', item.text + ' — claim it back');
+    b.innerHTML = '<span class="ref"></span><span class="desc"></span><span class="arrow">↺</span>';
+    // textContent, never innerHTML: this is the visitor's own writing
+    $('.ref', b).textContent = item.ref;
+    const d = $('.desc', b);
+    d.textContent = item.text;
+    const when = document.createElement('span');
+    when.className = 'when';
+    when.textContent = heldSince(item.at) + ' · click to take it back';
+    d.appendChild(when);
+    b.addEventListener('click', () => claimBack(item.ref));
+    li.appendChild(b);
+    ul.appendChild(li);
+  });
+}
+
+function claimBack(ref) {
+  saveHeld(held().filter((i) => i.ref !== ref));
+  renderHeld();
+  station.click(0.08);
+  announce(ref + ' returned to you. It was here the whole time.');
+}
+
+/* ---- the deposit slip ------------------------------------------- */
+
+let counterOpen = false;
+
+function openCounter(item) {
+  const el = $('#counter');
+  $('#ctr-ref').textContent = item.ref;
+  $('#ctr-item').textContent = item.desc;
+  $('#ctr-note').textContent = item.note || '';
+  $('#ctr-prompt').textContent = COUNTER_PROMPTS[(Math.random() * COUNTER_PROMPTS.length) | 0];
+  const ta = $('#ctr-text');
+  ta.value = '';
+  $('#ctr-n').textContent = '0';
+  $('#ctr-hand').disabled = true;
+  $('#ctr-receipt').hidden = true;
+
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+  el.inert = false;
+  document.documentElement.style.overflow = 'hidden';
+  counterOpen = true;
+  station.chime();
+  setTimeout(() => ta.focus(), 260);
+}
+
+function closeCounter() {
+  const el = $('#counter');
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+  el.inert = true;
+  document.documentElement.style.overflow = '';
+  counterOpen = false;
+}
+
+async function handItIn() {
+  const ta = $('#ctr-text');
+  const text = ta.value.trim();
+  if (!text) return;
+
+  const ref = makeRef(text);
+  const list = held();
+  list.push({ ref: ref, text: text, at: Date.now() });
+  saveHeld(list.slice(-40));
+  renderHeld();
+
+  const receipt = $('#ctr-receipt');
+  receipt.textContent =
+    'Received. Reference ' + ref + '. Held until morning — you can come back for it ' +
+    'any time, and you do not have to.';
+  receipt.hidden = false;
+  ta.value = '';
+  $('#ctr-n').textContent = '0';
+  $('#ctr-hand').disabled = true;
+
+  station.chime();
+  // letters and digits spaced, or she reads the reference as a word
+  const parts = ref.split('-');
+  await announce(ref + ' — held until morning.', {
+    speak: [
+      'Item received.',
+      'Reference ' + parts[0].split('').join(' ') + ', ' + parts[1].split('').join(' ') + '.',
+      'It will be held until morning.',
+    ],
+  });
+  setTimeout(() => { if (counterOpen) closeCounter(); }, 1400);
+}
+
+function counterWiring() {
+  const ta = $('#ctr-text');
+  ta.addEventListener('input', () => {
+    $('#ctr-n').textContent = String(ta.value.length);
+    $('#ctr-hand').disabled = ta.value.trim().length === 0;
+  });
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handItIn();
+  });
+  $('#ctr-hand').addEventListener('click', handItIn);
+  $('#ctr-close').addEventListener('click', closeCounter);
+  $('#counter').addEventListener('click', (e) => {
+    if (e.target === $('#counter')) closeCounter();
+  });
 }
 
 /* Run something once, when its section approaches the viewport. */
@@ -721,7 +891,7 @@ function nightWiring() {
    sweep the light will make, so they arrive together.
    ================================================================ */
 const SWEEP_PERIOD = 1 / 0.0455;
-const QUIET_BETWEEN = [22000, 32000];    // silence between one pass and the next
+const QUIET_BETWEEN = [30000, 45000];    // silence between one pass and the next
 
 let trainDue = Infinity;
 /** The announcer sets the first one going once she has finished. */
@@ -767,8 +937,15 @@ function trainWatch() {
    ================================================================ */
 function keys() {
   addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { currentDest ? returnHome() : null; return; }
+    // letter shortcuts must not fire while she is writing on the slip
+    const typing = /^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '');
+    if (e.key === 'Escape') {
+      if (counterOpen) { closeCounter(); return; }
+      if (currentDest) returnHome();
+      return;
+    }
     if (!entered && (e.key === 'Enter' || e.key === ' ')) { enterStation(); return; }
+    if (typing) return;
     if (e.key === 'm' || e.key === 'M') { station.toggle(); if (!station.enabled) announcer.cancel(); updateSoundBtn(); return; }
     if (e.key === 'q' || e.key === 'Q') {
       if (!gl.ok) return;
@@ -787,6 +964,7 @@ function init() {
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   scrollTo(0, 0);
   $('#arrival').inert = true;
+  $('#counter').inert = true;
   $('#concourse').inert = true;   // until the gate opens
   $('#topbar').inert = true;
 
@@ -806,6 +984,7 @@ function init() {
   keys();
   driftBoard();
   nightWiring();
+  counterWiring();
   trainWatch();
 
   if (gl.ok) {

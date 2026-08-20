@@ -1035,16 +1035,13 @@ export class Station {
     };
     /* Offsets are fractions of the pass, not absolute seconds, so a
        short pass never schedules a blast in the past. */
+    // Two. One at distance to announce itself, one as it goes through.
     for (const [frac, lenFrac, lv] of [
-      [-0.42, 0.130, 0.72],
-      [-0.28, 0.120, 0.82],
-      [-0.18, 0.050, 0.86],
-      [-0.10, 0.260, 1.00],
+      [-0.38, 0.145, 0.80],
+      [-0.11, 0.165, 1.00],
     ]) {
       blast(Math.max(t0 + 0.2, at + frac * dur), dur * lenFrac, lv);
     }
-    // one more on the way out, already going away from you
-    if (Math.random() < 0.7) blast(at + dur * rand(0.18, 0.26), dur * 0.14, 0.55);
 
     /* ---- exhaust and bell, scheduled a little ahead at a time ----
        Four beats a revolution. The offsets are deliberately uneven:

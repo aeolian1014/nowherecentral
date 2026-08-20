@@ -255,6 +255,38 @@ match.
 
 ---
 
+## The counter
+
+The lost property list started as decoration that looked interactive.
+It is now the one part of this station that is actually of use.
+
+Writing down what is on your mind before bed — cognitive offloading, or
+"constructive worry" — measurably shortens how long it takes to fall
+asleep. A mind stops rehearsing something once it trusts that something
+else is holding it. So: pick up any item on the counter, and the clerk
+turns it round on you.
+
+> **KEY-0003** — A key to a door demolished in 1974.
+> *It still turns. There is simply nothing left for it to turn in. You
+> can put it down.*
+>
+> **What is it you keep picking back up?**
+
+Whatever you write gets a reference derived from your own words, and
+appears under **Held for you** with how long it has been there. The
+announcer reads the reference back. You can take any of it home again
+with one click, which is the half that matters — it was never
+confiscated, only held.
+
+Every item has its own line, so the doorway is different depending on
+what you pick up, and the prompt rotates so the counter never asks
+twice the same way.
+
+**It never leaves the device.** It is `localStorage` and nothing else —
+there is no server here to send it to, which is also why the placeholder
+says nobody reads them. Entries are rendered with `textContent`, never
+`innerHTML`, so a paste of markup stays a paste of markup.
+
 ## Night service
 
 Press **N**. The station stays open: volume, a sleep timer (15/30/60/90),

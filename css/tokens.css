@@ -66,10 +66,7 @@
   --fs-xl: 1.5rem;
   --fs-2xl: clamp(1.9rem, 3.4vw, 2.75rem);
   --fs-3xl: clamp(2.6rem, 6vw, 5rem);
-  /* Bigger is also more legible here: a hairline's thickness scales with
-     the type, so raising the ceiling puts more pixels in the thin
-     strokes as well as more drama on the page. */
-  --fs-mega: clamp(3.2rem, 13.5vw, 15rem);
+  --fs-mega: clamp(2.6rem, 9.5vw, 10.5rem);
 
   --tracking-wide: 0.18em;
   --tracking-wider: 0.34em;
