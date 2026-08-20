@@ -1005,6 +1005,120 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 #pa .txt { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* ------------------------------------------------------------------
+   8a. The quiet room — a scene, and as little else as possible
+
+   The canvas is already fixed and full-bleed, so this overlay carries
+   no background of its own. It is only the handful of words around
+   the edge, and even those take themselves away.
+------------------------------------------------------------------ */
+
+#quiet {
+  position: fixed;
+  inset: 0;
+  z-index: 52;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1400ms var(--ease-std), visibility 1400ms;
+}
+#quiet.open { opacity: 1; visibility: visible; }
+
+.q-chrome {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: var(--sp-6) var(--gutter) var(--sp-6);
+  /* three and a half seconds, so it leaves without you noticing */
+  transition: opacity 3500ms var(--ease-std);
+}
+body.q-still .q-chrome { opacity: 0; pointer-events: none; }
+
+.q-top {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+#q-back {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  letter-spacing: var(--tracking-wide);
+  transition: all var(--d-fast) var(--ease-std);
+}
+#q-back:hover { color: var(--accent); border-color: var(--accent); }
+.q-ref { color: var(--accent); }
+
+.q-bottom {
+  grid-row: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+.q-text { max-width: 46ch; }
+.q-text h2 {
+  font-family: var(--font-display);
+  --display-opsz: 26;
+  --display-wght: 480;
+  font-size: var(--fs-xl);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin-bottom: var(--sp-2);
+}
+.q-text p {
+  color: var(--bone-300);
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+}
+.q-acts { display: flex; gap: var(--sp-2); }
+.q-btn {
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: all var(--d-fast) var(--ease-std);
+}
+.q-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.q-hint {
+  grid-row: 2;
+  align-self: end;
+  justify-self: center;
+  margin-bottom: var(--sp-6);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0;
+  animation: qhint 9s var(--ease-std) 2s forwards;
+}
+@keyframes qhint {
+  0% { opacity: 0; }
+  18%, 62% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (max-width: 700px) {
+  .q-bottom { flex-direction: column; align-items: stretch; }
+  .q-acts { justify-content: stretch; }
+  .q-btn { flex: 1; text-align: center; }
+}
+
+/* ------------------------------------------------------------------
    8b. The counter — lost property as a place to put things down
 ------------------------------------------------------------------ */
 

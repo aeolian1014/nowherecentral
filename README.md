@@ -255,37 +255,52 @@ match.
 
 ---
 
-## The counter
+## The quiet room
 
-The lost property list started as decoration that looked interactive.
-It is now the one part of this station that is actually of use.
+Pick anything up off the lost property counter and it plays back what
+it has been looking at: one slow scene, full screen, with nothing to do
+and nothing that ends.
 
-Writing down what is on your mind before bed — cognitive offloading, or
-"constructive worry" — measurably shortens how long it takes to fall
-asleep. A mind stops rehearsing something once it trusts that something
-else is holding it. So: pick up any item on the counter, and the clerk
-turns it round on you.
+| | |
+|---|---|
+| **Rain, arriving late** | Fourteen drops on their own long cycles, interfering. The slope comes from the analytic derivative of the same wave, so the light on the crests is real rather than painted. |
+| **Warmth, second-hand** | No shapes at all — warm blooms drifting the way they do behind a closed eye near a lamp. |
+| **A held afternoon** | Dust in a shaft of four-o'clock light. The motes take a minute to cross it. |
+| **A door left open** | Rectangles of light receding on a log scale. It never arrives and never stops, which between them is the restful part. |
+| **The shape of the verse** | Chladni figures — the nodal lines of a plate driven at a frequency that keeps changing its mind. |
+| **Four in, seven held, eight out** | The only one with a job: the 4-7-8 cadence drawn as a bloom you follow, with a ring showing where you are in it. |
+| **Everyone, looking left** | A particle field under a curl-noise flow, very nearly arranging itself into something and then thinking better of it. |
+| **The window seat** | Four ridgelines at four speeds, and lights out there belonging to people who are also still awake. |
 
-> **KEY-0003** — A key to a door demolished in 1974.
-> *It still turns. There is simply nothing left for it to turn in. You
-> can put it down.*
->
-> **What is it you keep picking back up?**
+Rules all eight follow:
 
-Whatever you write gets a reference derived from your own words, and
-appears under **Held for you** with how long it has been there. The
-announcer reads the reference back. You can take any of it home again
-with one click, which is the half that matters — it was never
-confiscated, only held.
+- **Nothing sudden, ever.** No cuts, no flashes, nothing that strobes.
+- **Low luminance and low contrast.** A bright screen at 2am is a lie.
+- **Long, irrational cycle lengths**, so nothing lands on a beat you can
+  start anticipating — the fourteen ripple drops each have their own
+  prime-ish period and never sync up.
+- **Cheap enough to leave running all night.** No raymarching, small
+  loops; they share the renderer's whole quality and night-mode ladder.
 
-Every item has its own line, so the doorway is different depending on
-what you pick up, and the prompt rotates so the counter never asks
-twice the same way.
+The chrome takes itself away after five seconds of stillness, so what is
+left is the thing itself. Move anything and it comes back.
 
-**It never leaves the device.** It is `localStorage` and nothing else —
-there is no server here to send it to, which is also why the placeholder
-says nobody reads them. Entries are rendered with `textContent`, never
-`innerHTML`, so a paste of markup stays a paste of markup.
+### The counter
+
+Underneath each scene there is still a slip. Writing down what is on
+your mind before bed — cognitive offloading, or "constructive worry" —
+measurably shortens how long it takes to fall asleep: a mind stops
+rehearsing something once it trusts that something else is holding it.
+
+Whatever you write gets a reference derived from your own words and
+appears under **Held for you**, and the announcer reads it back. You can
+take any of it home again with one click, which is the half that matters
+— it was never confiscated, only held.
+
+**It never leaves the device.** It is `localStorage` and nothing else;
+there is no server here to send it to, which is why the placeholder says
+nobody reads them. Entries render through `textContent`, never
+`innerHTML`.
 
 ## Night service
 

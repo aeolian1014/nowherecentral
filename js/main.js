@@ -7,6 +7,7 @@ import { FlapLine } from './board.js';
 import { Renderer } from './gl.js';
 import { Station } from './audio.js';
 import { Announcer, welcomeLine, departureLine } from './voice.js';
+import { SCENE_OF } from './scenes.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -206,7 +207,7 @@ function driftBoard() {
    Departure → arrival
    ================================================================ */
 async function depart_to(id) {
-  if (inTransit || !entered || performance.now() < gateUntil) return;
+  if (inTransit || quietOpen || !entered || performance.now() < gateUntil) return;
   buildBoard();
   populateBoard();
   const entry = rows.find((r) => r.d.id === id);
@@ -484,7 +485,7 @@ function lostAndFound() {
     b.innerHTML = '<span class="ref"></span><span class="desc"></span><span class="arrow">↗</span>';
     $('.ref', b).textContent = ref;
     $('.desc', b).textContent = desc;
-    b.addEventListener('click', () => openCounter({ ref, desc, note }));
+    b.addEventListener('click', () => openQuiet({ ref, desc, note }));
     li.appendChild(b);
     frag.appendChild(li);
   });
@@ -528,6 +529,132 @@ function claimBack(ref) {
   announce(ref + ' returned to you. It was here the whole time.');
 }
 
+/* ================================================================
+   The quiet room
+
+   Picking something up off the counter does not open a form. It
+   plays back what the object has been looking at: one slow scene,
+   full screen, with nothing to do and nothing that ends.
+
+   The chrome removes itself after a few seconds of stillness, so
+   what is left is the thing itself. Move anything and it comes back.
+   ================================================================ */
+
+const QUIET_STILL_AFTER = 5000;
+let quietOpen = false;
+let quietItem = null;
+let quietStill = 0;
+
+async function openQuiet(item) {
+  if (quietOpen || inTransit) return;
+  const scene = SCENE_OF[item.ref];
+  if (!scene || !gl.ok) { openCounter(item); return; }   // no WebGL: fall back to the slip
+
+  quietOpen = true;
+  quietItem = item;
+  inTransit = true;
+
+  $('#q-ref').textContent = item.ref;
+  $('#q-title').textContent = scene.title;
+  $('#q-caption').textContent = scene.caption;
+
+  station.chime();
+
+  // a long fade rather than the departure warp: nothing here is sudden
+  if (!REDUCED) {
+    await tween({ from: 0, to: 1, dur: 1500, ease: easeInOut, onUpdate: (v) => { gl.fade = v; } });
+  }
+  gl.setWorld(scene.id);
+  station.setWorld('spire');            // the calmest bed on the site
+  document.body.classList.add('away');
+  $('#concourse').inert = true;
+  $('#topbar').inert = true;
+  document.documentElement.style.overflow = 'hidden';
+
+  const q = $('#quiet');
+  q.classList.add('open');
+  q.setAttribute('aria-hidden', 'false');
+  q.inert = false;
+  markQuietMoved();
+
+  if (!REDUCED) {
+    await tween({ from: 1, to: 0, dur: 2200, ease: easeOut, onUpdate: (v) => { gl.fade = v; } });
+  }
+  gl.fade = 0;
+  inTransit = false;
+}
+
+async function closeQuiet() {
+  if (!quietOpen || inTransit) return;
+  inTransit = true;
+
+  if (!REDUCED) {
+    await tween({ from: 0, to: 1, dur: 1100, ease: easeIn, onUpdate: (v) => { gl.fade = v; } });
+  }
+  const q = $('#quiet');
+  q.classList.remove('open');
+  q.setAttribute('aria-hidden', 'true');
+  q.inert = true;
+  document.body.classList.remove('away', 'q-still');
+  $('#concourse').inert = false;
+  $('#topbar').inert = false;
+  document.documentElement.style.overflow = '';
+  gl.setWorld('concourse');
+  station.setWorld('concourse');
+  quietOpen = false;
+  quietItem = null;
+
+  if (!REDUCED) {
+    await tween({ from: 1, to: 0, dur: 1400, ease: easeOut, onUpdate: (v) => { gl.fade = v; } });
+  }
+  gl.fade = 0;
+  inTransit = false;
+}
+
+/** move to something else on the counter without going back for it */
+function nextQuiet() {
+  if (!quietItem) return;
+  const refs = LOST_AND_FOUND.map((r) => r[0]);
+  let i = refs.indexOf(quietItem.ref);
+  i = (i + 1 + (Math.random() * (refs.length - 1) | 0)) % refs.length;
+  const row = LOST_AND_FOUND[i];
+  const scene = SCENE_OF[row[0]];
+  if (!scene) return;
+  quietItem = { ref: row[0], desc: row[1], note: row[2] };
+  $('#q-ref').textContent = row[0];
+  $('#q-title').textContent = scene.title;
+  $('#q-caption').textContent = scene.caption;
+  gl.setWorld(scene.id);
+  station.click(0.05);
+  markQuietMoved();
+}
+
+function markQuietMoved() {
+  quietStill = performance.now();
+  if (document.body.classList.contains('q-still')) {
+    document.body.classList.remove('q-still');
+  }
+}
+
+function quietWatch() {
+  setInterval(() => {
+    if (!quietOpen) return;
+    if (performance.now() - quietStill > QUIET_STILL_AFTER) {
+      document.body.classList.add('q-still');
+    }
+  }, 500);
+  ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'].forEach((ev) =>
+    addEventListener(ev, () => quietOpen && markQuietMoved(), { passive: true })
+  );
+}
+
+function quietWiring() {
+  $('#q-back').addEventListener('click', closeQuiet);
+  $('#q-next').addEventListener('click', nextQuiet);
+  $('#q-leave').addEventListener('click', () => quietItem && openCounter(quietItem));
+  quietWatch();
+}
+
 /* ---- the deposit slip ------------------------------------------- */
 
 let counterOpen = false;
@@ -558,7 +685,7 @@ function closeCounter() {
   el.classList.remove('open');
   el.setAttribute('aria-hidden', 'true');
   el.inert = true;
-  document.documentElement.style.overflow = '';
+  if (!quietOpen) document.documentElement.style.overflow = '';
   counterOpen = false;
 }
 
@@ -941,6 +1068,7 @@ function keys() {
     const typing = /^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '');
     if (e.key === 'Escape') {
       if (counterOpen) { closeCounter(); return; }
+      if (quietOpen) { closeQuiet(); return; }
       if (currentDest) returnHome();
       return;
     }
@@ -965,6 +1093,7 @@ function init() {
   scrollTo(0, 0);
   $('#arrival').inert = true;
   $('#counter').inert = true;
+  $('#quiet').inert = true;
   $('#concourse').inert = true;   // until the gate opens
   $('#topbar').inert = true;
 
@@ -985,6 +1114,7 @@ function init() {
   driftBoard();
   nightWiring();
   counterWiring();
+  quietWiring();
   trainWatch();
 
   if (gl.ok) {
@@ -1014,6 +1144,7 @@ function init() {
     go: depart_to,
     home: returnHome,
     sleep: toggleNight,
+    watch: (ref) => openQuiet({ ref, desc: '', note: '' }),
     /** NC.train() — hear one now, without waiting. NC.train(0.2) = close. */
     train: (far = 0.6) => station.steamTrain({ dur: 18, far }),
     /**

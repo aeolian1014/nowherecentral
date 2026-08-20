@@ -10,7 +10,7 @@ void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }
 `;
 
 /* Shared prelude injected into every world shader. */
-const PRE = `#version 300 es
+export const PRE = `#version 300 es
 precision highp float;
 out vec4 fragColor;
 
@@ -76,7 +76,7 @@ vec3 aces(vec3 x){
 /* Grain and vignette live here, not in a second pass. An idle frame is
    then a single draw with no render target and no texture reads — the
    post chain only wakes up for a departure. */
-const TAIL = `
+export const TAIL = `
 void main(){
   vec2 st = gl_FragCoord.xy / uRes;
   vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;

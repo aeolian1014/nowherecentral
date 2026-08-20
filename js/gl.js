@@ -5,6 +5,10 @@
 ------------------------------------------------------------------ */
 
 import { VERT, WORLDS, POST } from './shaders.js';
+import { SCENES } from './scenes.js';
+
+/* Destination worlds and quiet-room scenes share one compile path. */
+const PROGRAMS = Object.assign({}, WORLDS, SCENES);
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -174,7 +178,7 @@ export class Renderer {
   setWorld(name) {
     if (!this.ok) return false;
     if (!this.programs.has(name)) {
-      const src = WORLDS[name];
+      const src = PROGRAMS[name];
       if (!src) return false;
       const prog = this._program(VERT, src);
       if (!prog) return false;
@@ -198,7 +202,7 @@ export class Renderer {
     const step = () => {
       const n = queue.shift();
       if (!n) return;
-      const prog = this._program(VERT, WORLDS[n]);
+      const prog = this._program(VERT, PROGRAMS[n]);
       if (prog) this.programs.set(n, prog);
       if (queue.length) idle(step);
     };
