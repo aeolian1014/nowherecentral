@@ -223,6 +223,28 @@ export class Renderer {
     return q.name;
   }
 
+  /**
+   * Night mode is not a quality tier — it sits on top of whichever one
+   * is chosen, and restores it exactly. Six frames a second at a third
+   * of the pixels is roughly 1/40th the work.
+   */
+  setNight(on) {
+    if (on === !!this._night) return;
+    this._night = on;
+    if (on) {
+      this._preNight = { scale: this.scale, budget: this.budget, fps: this.minFrameMs };
+      this.scale = Math.min(this.scale, 0.34);
+      this.budget = Math.min(this.budget, 300000);
+      this.minFrameMs = 1000 / 6;
+    } else if (this._preNight) {
+      this.scale = this._preNight.scale;
+      this.budget = this._preNight.budget;
+      this.minFrameMs = this._preNight.fps;
+    }
+    this.w = this.h = -1;
+    this.resize();
+  }
+
   restoreQuality() {
     let i = 0;
     try { i = parseInt(localStorage.getItem('nc-quality') || '0', 10) || 0; } catch (e) {}
@@ -273,8 +295,8 @@ export class Renderer {
       if (this.minFrameMs && elapsed < this.minFrameMs - 1) return;
       const dt = Math.min(0.05, elapsed / 1000);
       this._last = now;
-      // a hand-picked quality is not second-guessed
-      if (QUALITY[this.quality].auto) this._adapt(dt);
+      // a hand-picked quality is not second-guessed, nor is night mode
+      if (QUALITY[this.quality].auto && !this._night) this._adapt(dt);
       this.render(dt);
     };
     this._raf = requestAnimationFrame(loop);

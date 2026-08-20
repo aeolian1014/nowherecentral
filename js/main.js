@@ -89,6 +89,7 @@ function enterStation() {
   entered = true;
   gateUntil = performance.now() + 1200;
   scrollTo(0, 0);
+  gl.ok && gl.start();          // nothing was drawn behind the boot veil
   station.init();
   station.enable();
   station.setWorld('concourse');
@@ -102,7 +103,12 @@ function enterStation() {
     announce('Welcome to Nowhere Central. The board is live.');
     station.chime();
   }, 900);
-  setTimeout(() => populateBoard(), 500);
+  setTimeout(() => {
+    buildBoard();
+    // if the board is already on screen there is nothing to wait for
+    const shell = $('#board-shell').getBoundingClientRect();
+    if (shell.top < innerHeight - 60) populateBoard();
+  }, 500);
 }
 
 /* ================================================================
@@ -112,7 +118,14 @@ function hhmm(date) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/* The board is 192 cells and 960 elements. Building it on load is a
+   third of a second of parser time for something two screens down, so
+   it is built when the section comes within a screen of the viewport
+   — and always before the visitor can reach it. */
+let boardBuilt = false;
 function buildBoard() {
+  if (boardBuilt) return;
+  boardBuilt = true;
   const host = $('#board-rows');
   DESTINATIONS.forEach((d, i) => {
     const row = document.createElement('button');
@@ -141,7 +154,10 @@ function buildBoard() {
   });
 }
 
+let boardFilled = false;
 function populateBoard() {
+  if (boardFilled || !rows.length) return;
+  boardFilled = true;
   rows.forEach((r, i) => {
     const base = i * 90;
     r.time.set(hhmm(r.depart), { from: base });
@@ -176,6 +192,8 @@ function driftBoard() {
    ================================================================ */
 async function depart_to(id) {
   if (inTransit || !entered || performance.now() < gateUntil) return;
+  buildBoard();
+  populateBoard();
   const entry = rows.find((r) => r.d.id === id);
   if (!entry) return;
   const d = entry.d;
@@ -367,14 +385,34 @@ function notices() {
   }, 9000);
 }
 
+let lfBuilt = false;
 function lostAndFound() {
+  if (lfBuilt) return;
+  lfBuilt = true;
   const ul = $('#lf-list');
+  const frag = document.createDocumentFragment();
   LOST_AND_FOUND.forEach(([ref, desc]) => {
     const li = document.createElement('li');
     li.className = 'lf-row';
     li.innerHTML = `<span class="ref">${ref}</span><span class="desc">${desc}</span><span class="arrow">↗</span>`;
-    ul.appendChild(li);
+    frag.appendChild(li);
   });
+  ul.appendChild(frag);
+}
+
+/* Run something once, when its section approaches the viewport. */
+function lazySection(selector, run, rootMargin = '900px 0px') {
+  const el = $(selector);
+  if (!el) return;
+  const io = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      run();
+    },
+    { rootMargin }
+  );
+  io.observe(el);
 }
 
 /* one pointer, read by the shaders, the cursor and the hero */
@@ -455,6 +493,189 @@ function updateSoundBtn() {
 }
 
 /* ================================================================
+   Night service
+
+   Sleep audio has requirements a pretty page does not: it has to be
+   able to end on its own, it must not burn a screen or a battery for
+   six hours, and the volume has to be reachable in the dark.
+   ================================================================ */
+
+const DIM_1_AFTER = 55000;    // screen steps back
+const DIM_2_AFTER = 105000;   // screen goes out, GPU goes to sleep
+const FADE_SECONDS = 90;
+
+const night = {
+  on: false,
+  minutes: 0,
+  endsAt: 0,
+  ending: false,
+  lastTouch: 0,
+  dim: 0,
+};
+
+function nightOn() {
+  return night.on;
+}
+
+function toggleNight(force) {
+  const on = force === undefined ? !night.on : force;
+  if (on === night.on) return;
+  night.on = on;
+  document.body.classList.toggle('night', on);
+  $('#night').classList.toggle('open', on);
+  $('#night').setAttribute('aria-hidden', String(!on));
+  $('#night-btn').setAttribute('aria-pressed', String(on));
+  night.lastTouch = performance.now();
+
+  if (on) {
+    station.enable();
+    updateSoundBtn();
+    setDim(0);
+    announce('Night service. The station stays open.');
+  } else {
+    setDim(0);
+    setTimer(0);
+    night.ending = false;
+    station.setVolume(station.volume);
+    gl.ok && gl.setQuality(gl.quality);
+    announce('Night service ended.');
+  }
+  paintNightStatus();
+}
+
+function setDim(level) {
+  if (night.dim === level) return;
+  night.dim = level;
+  document.body.classList.toggle('dim-1', level >= 1);
+  document.body.classList.toggle('dim-2', level >= 2);
+  if (!gl.ok) return;
+  // NIGHT is the last tier: a handful of frames a second at a quarter
+  // of the pixels, so a laptop left on the nightstand stays cold.
+  if (level >= 2) gl.setNight(true);
+  else gl.setNight(false);
+}
+
+function setTimer(minutes) {
+  night.minutes = minutes;
+  night.ending = false;
+  night.endsAt = minutes ? Date.now() + minutes * 60000 : 0;
+  $$('#timer-chips button').forEach((b) =>
+    b.setAttribute('aria-pressed', String(+b.dataset.min === minutes))
+  );
+  if (minutes) station.setVolume(station.volume);
+  paintNightStatus();
+}
+
+function paintNightStatus() {
+  const el = $('#night-status');
+  if (!el) return;
+  if (!night.on) { el.textContent = 'Station open. No timer set.'; return; }
+  if (!night.minutes) { el.textContent = 'Station open. No timer set.'; return; }
+  const left = Math.max(0, night.endsAt - Date.now());
+  if (night.ending) { el.textContent = 'Last service. Fading out.'; return; }
+  const m = Math.floor(left / 60000);
+  const s = Math.floor((left % 60000) / 1000);
+  el.textContent = `Last service in ${m}:${String(s).padStart(2, '0')}.`;
+}
+
+function nightTick() {
+  const nc = $('#nightclock');
+  const time = $('.nc-time', nc);
+  const where = $('.nc-where', nc);
+  const timer = $('.nc-timer', nc);
+
+  setInterval(() => {
+    if (!night.on) return;
+
+    const idle = performance.now() - night.lastTouch;
+    if (idle > DIM_2_AFTER) setDim(2);
+    else if (idle > DIM_1_AFTER) setDim(1);
+    else setDim(0);
+
+    const n = new Date();
+    const p = (v) => String(v).padStart(2, '0');
+    time.textContent = `${p(n.getHours())}:${p(n.getMinutes())}`;
+    where.textContent = currentDest ? currentDest.name : 'Nowhere Central';
+
+    if (night.minutes) {
+      const left = Math.max(0, night.endsAt - Date.now());
+      const m = Math.ceil(left / 60000);
+      timer.textContent = night.ending ? 'Fading out' : `Last service in ${m}m`;
+      if (!night.ending && left <= FADE_SECONDS * 1000) {
+        night.ending = true;
+        station.fadeOut(FADE_SECONDS);
+      }
+      if (left <= 0) {
+        setTimer(0);
+        toggleNight(false);
+        station.enabled && station.toggle();
+        updateSoundBtn();
+      }
+    } else {
+      timer.textContent = 'No timer';
+    }
+    paintNightStatus();
+  }, 1000);
+
+  // anything at all counts as being awake
+  const wake = () => {
+    night.lastTouch = performance.now();
+    if (night.dim) setDim(0);
+  };
+  ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'].forEach((ev) =>
+    addEventListener(ev, wake, { passive: true })
+  );
+}
+
+function nightWiring() {
+  $('#night-btn').addEventListener('click', () => toggleNight());
+  $('#night-close').addEventListener('click', () => toggleNight(false));
+
+  const vol = $('#vol');
+  const out = $('#vol-out');
+  vol.value = String(Math.round(station.volume * 100));
+  out.value = vol.value;
+  vol.addEventListener('input', () => {
+    out.value = vol.value;
+    station.enable();
+    station.setVolume(+vol.value / 100);
+    updateSoundBtn();
+  });
+
+  $$('#timer-chips button').forEach((b) =>
+    b.addEventListener('click', () => {
+      setTimer(+b.dataset.min);
+      station.enable();
+      updateSoundBtn();
+      announce(b.dataset.min === '0' ? 'Sleep timer off.' : `Sleep timer set for ${b.dataset.min} minutes.`);
+    })
+  );
+
+  nightTick();
+}
+
+/* ================================================================
+   Something passes the platform
+
+   The concourse shader sweeps a light across the floor once every
+   ~22 seconds. This watches that same clock so the crossing bell and
+   the rail joints land with it instead of near it.
+   ================================================================ */
+const SWEEP_PERIOD = 1 / 0.0455;
+function trainWatch() {
+  let lastCycle = -1;
+  setInterval(() => {
+    if (!gl.ok || gl.current !== 'concourse' || !station.enabled) return;
+    if (document.hidden || inTransit) return;
+    const cycle = Math.floor(gl.time / SWEEP_PERIOD);
+    if (cycle === lastCycle) return;
+    lastCycle = cycle;
+    // the sweep peaks halfway through the cycle
+    station.trainPass(SWEEP_PERIOD * 0.5);
+  }, 400);
+}
+
+/* ================================================================
    Wiring
    ================================================================ */
 function keys() {
@@ -467,6 +688,7 @@ function keys() {
       announce(`Rendering quality — ${gl.setQuality(gl.quality + 1)}`);
       return;
     }
+    if (e.key === 'n' || e.key === 'N') { toggleNight(); return; }
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= DESTINATIONS.length && entered && !currentDest) {
       depart_to(DESTINATIONS[n - 1].id);
@@ -480,8 +702,15 @@ function init() {
   $('#arrival').inert = true;
   $('#concourse').inert = true;   // until the gate opens
   $('#topbar').inert = true;
-  buildBoard();
-  lostAndFound();
+
+  /* Deferred work. The cells are built while the board is still a
+     screen away; the flip itself waits until you are actually looking
+     at it, because a departure board that has already finished
+     flipping is just a table. */
+  lazySection('#departures', buildBoard, '420px 0px');
+  lazySection('#board-shell', () => entered && populateBoard(), '-60px 0px');
+  lazySection('#lost', lostAndFound);
+
   clock();
   notices();
   cursor();
@@ -489,12 +718,14 @@ function init() {
   scrollFx();
   keys();
   driftBoard();
+  nightWiring();
+  trainWatch();
 
   if (gl.ok) {
     gl.restoreQuality();
     gl.setWorld('concourse');
-    gl.start();
     addEventListener('resize', () => gl.resize(), { passive: true });
+    // the boot veil is opaque — there is nothing to draw behind it
     gl.preload(['glass', 'noon', 'null', 'dunes', 'spire', 'inverted']);
   }
 
@@ -508,7 +739,7 @@ function init() {
   });
 
   // signalbox: for anyone who opens the console
-  window.NC = { gl, station, rows, go: depart_to, home: returnHome };
+  window.NC = { gl, station, rows, night, go: depart_to, home: returnHome, sleep: toggleNight };
 
   boot();
 }

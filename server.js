@@ -2,6 +2,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const ROOT = __dirname;
 const PORT = process.env.PORT || 4173;
@@ -32,11 +33,22 @@ http
         res.writeHead(404, { 'content-type': 'text/plain' }).end('404');
         return;
       }
-      res.writeHead(200, {
-        'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
-        'cache-control': 'no-store',
-      });
-      res.end(data);
+      const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
+      const headers = { 'content-type': type, 'cache-control': 'no-store' };
+
+      // GLSL and markup compress about 4:1 — worth ten lines
+      const accepts = String(req.headers['accept-encoding'] || '');
+      const text = /^(text|application\/(javascript|json)|image\/svg)/.test(type);
+      if (text && data.length > 1024 && /\bgzip\b/.test(accepts)) {
+        zlib.gzip(data, (e, gz) => {
+          if (e) { res.writeHead(200, headers).end(data); return; }
+          headers['content-encoding'] = 'gzip';
+          headers.vary = 'accept-encoding';
+          res.writeHead(200, headers).end(gz);
+        });
+        return;
+      }
+      res.writeHead(200, headers).end(data);
     });
   })
   .listen(PORT, () => console.log(`Nowhere Central → http://localhost:${PORT}`));

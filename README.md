@@ -94,12 +94,60 @@ of them earn it:
 
 ### The sound — `js/audio.js`
 
-No audio files. Pink noise beds through modulated biquads, detuned drone
-stacks with slow breathing LFOs, a two-tone platform chime, a feedback
-delay standing in for the hall, and one short filtered click per flap
-(throttled, or 2,400 clicks would arrive at once).
+No audio files, and that is a feature rather than a saving. A sample
+pack — even a hundred of them — eventually loops, and a brain trying to
+fall asleep is very good at noticing periodicity. Noise driven by slow
+LFOs at unrelated rates never repeats, and the whole engine is about
+eight kilobytes.
+
+Three layers per world:
+
+- **Beds** — pink noise through a modulated biquad. The bed *drifts*:
+  every 20–45 seconds its filter and gain retarget to a new random point
+  over a ten-second glide, so hour two does not sound like hour one.
+- **Drones** — detuned oscillator stacks with slow breathing LFOs.
+- **Events** — the things that happen occasionally. Drawn from a
+  weighted pool at a random interval, so nothing falls into a rhythm.
+
+Plus named cues: the platform chime, the departure sweep, one filtered
+click per flap (throttled, or 2,400 would arrive at once), and
+`trainPass()` — a level-crossing bell, a swelling approach and rail
+joints, timed against the same clock the shader uses to sweep light
+across the concourse floor, so the sound and the light arrive together.
 
 Off until you ask for it — press **M** or use the toggle.
+
+#### Writing a pack
+
+Each world's recipe is one object in `PRESETS`. To describe a new pack,
+these are the knobs that exist — say it in these terms and it maps
+straight across:
+
+```js
+glass: {
+  beds: [
+    // filter type, centre frequency, resonance, level,
+    // and [lfo rate in Hz, sweep depth in Hz]
+    { type: 'highpass', freq: 1500, q: 0.6, gain: 0.085, lfo: [0.09, 400] },
+  ],
+  drones: [
+    { f: 48, type: 'sine', gain: 0.05 },   // f in Hz, any oscillator type
+  ],
+  events: { every: [26, 70], pool: ['thunder', 'swell', 'thunder', 'groan'] },
+  //         ^ seconds between       ^ repeats = higher odds
+}
+```
+
+Generators currently available to a pool: `thunder`, `gust`, `swell`,
+`rumble`, `groan`, `drip`, `chime`, `bird`, `cicada`, `clatter`,
+`dropout`, `carrier`, `doorFar`, `tannoy`. Each takes its own randomised
+ranges, so two `gust` events are never the same gust.
+
+**The current pools are structural placeholders.** They prove the
+machinery, not the mood. Describe what each place should *sound* like —
+"the Glass Sea should be rain on a window from inside a warm room, with
+thunder so distant it is only felt" — and the recipe gets rewritten to
+match.
 
 ---
 
@@ -111,9 +159,44 @@ Off until you ask for it — press **M** or use the toggle.
 | `Esc` | Return to Nowhere Central |
 | `M` | Sound on / off |
 | `Q` | Rendering quality — Auto → High → Medium → Low. Low halves the frame rate and quarters the pixels. Remembered between visits. |
+| `N` | Night service |
 | `NC` | A handle on the console: `NC.go('spire')`, `NC.home()`, `NC.gl`, `NC.station` |
 
 ---
+
+## Night service
+
+Press **N**. The station stays open: volume, a sleep timer (15/30/60/90),
+and a screen that puts itself out.
+
+After 55 seconds without input the page steps back; after 105 seconds it
+goes dark but for a clock, where you are, and how long is left. The
+renderer follows it down to **6 frames a second at a third of the
+pixels** — about a fortieth of the work — so a laptop left on the
+nightstand stays cold. Move anything and it all comes back over two and a
+half seconds. When the timer runs out the audio tapers to silence over 90
+seconds rather than stopping.
+
+**An honest limit:** this is a page, not an app. Browsers throttle
+background tabs and suspend audio on locked phones, and there is no
+lock-screen control. Keep the tab in front and it works well. For a phone
+under a pillow, a native app wins, and no amount of code here changes
+that.
+
+## Loading
+
+FCP around **110ms**; **46KB on the wire** for 149KB of source, gzipped
+by the little server. There are no images anywhere, so there is nothing
+to lazy-load in the usual sense — but there is still work worth deferring:
+
+- The renderer does not start until you enter. The boot veil is opaque,
+  so every frame drawn behind it was thrown away.
+- The board's 192 cells are built from an IntersectionObserver after
+  first paint rather than during parse, and Lost & Found is built when
+  its section approaches.
+- The **flip** waits until the board is actually on screen. A departure
+  board that has already finished flipping is just a table.
+- All seven shader programs compile during idle time.
 
 ## Notes
 

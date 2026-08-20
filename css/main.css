@@ -977,7 +977,204 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 #pa .txt { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* ------------------------------------------------------------------
-   9. Small screens — the board becomes something you pan
+   9. Night service
+------------------------------------------------------------------ */
+
+#nightfall {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 2600ms var(--ease-std);
+}
+body.dim-1 #nightfall { opacity: 0.62; }
+body.dim-2 #nightfall { opacity: 0.945; }
+
+/* the whole document steps back as the night deepens */
+body.night .stage,
+body.night .topbar { transition: opacity 2400ms var(--ease-std); }
+body.dim-1 .stage { opacity: 0.5; }
+body.dim-1 .topbar { opacity: 0.25; }
+body.dim-2 .stage,
+body.dim-2 .topbar { opacity: 0; }
+
+#nightclock {
+  position: fixed;
+  z-index: 46;
+  inset: auto auto var(--sp-9) var(--gutter);
+  display: grid;
+  gap: var(--sp-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 2600ms var(--ease-std);
+}
+body.dim-2 #nightclock { opacity: 1; }
+#nightclock .nc-time {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 9vw, 7rem);
+  line-height: 0.9;
+  color: #2a2118;
+  font-variant-numeric: tabular-nums;
+}
+#nightclock .nc-where,
+#nightclock .nc-timer {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: #1b1712;
+}
+
+#night {
+  position: fixed;
+  z-index: 47;
+  right: var(--gutter);
+  bottom: var(--sp-6);
+  width: min(360px, calc(100vw - var(--gutter) * 2));
+  padding: var(--sp-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, rgba(11, 14, 20, 0.97), rgba(5, 7, 10, 0.98));
+  box-shadow: var(--e-2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  transition: opacity var(--d-med) var(--ease-out), transform var(--d-med) var(--ease-out),
+    visibility var(--d-med);
+}
+#night.open { opacity: 1; visibility: visible; transform: none; }
+body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
+
+.night-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+.night-head .moon { color: var(--accent); font-size: var(--fs-lg); line-height: 1; }
+.night-head h2 {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+#night-close {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  transition: color var(--d-fast);
+}
+#night-close:hover { color: var(--accent); }
+
+.night-lede {
+  font-size: var(--fs-sm);
+  color: var(--bone-300);
+  margin-bottom: var(--sp-5);
+  line-height: 1.6;
+}
+
+.night-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding-block: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+.night-row.col { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+.night-row label,
+.night-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.night-row output {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--accent);
+  width: 2.4em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#vol {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: var(--border-strong);
+  border-radius: var(--r-full);
+  cursor: none;
+}
+#vol::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(255, 179, 71, 0.5);
+  cursor: none;
+}
+#vol::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.chips { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.chips button {
+  flex: 1;
+  min-width: 3.4em;
+  padding: 7px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  transition: all var(--d-fast) var(--ease-std);
+}
+.chips button:hover { color: var(--accent); border-color: var(--accent); }
+.chips button[aria-pressed='true'] {
+  color: var(--ink-1000);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.night-status {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  line-height: 1.7;
+}
+.night-fineprint {
+  margin-top: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+.tb-btn .moon { font-size: var(--fs-sm); line-height: 1; }
+.tb-btn[aria-pressed='true'] { color: var(--accent); border-color: var(--accent); background: var(--accent-ghost); }
+
+/* ------------------------------------------------------------------
+   10. Small screens — the board becomes something you pan
 ------------------------------------------------------------------ */
 
 @media (max-width: 760px) {
@@ -1001,7 +1198,9 @@ body.away .topbar { opacity: 0; pointer-events: none; }
   .hero { min-height: 92svh; }
   .hero-title { line-height: 0.9; }
   .topbar .right { gap: var(--sp-2); }
-  #sound-label { display: none; }
+  #sound-label, .tb-label { display: none; }
+  #night { right: var(--sp-4); left: var(--sp-4); width: auto; }
+  #nightclock { inset: auto auto var(--sp-8) var(--sp-4); }
   .stat { padding: var(--sp-4); }
   .arr-inner { padding-top: var(--sp-7); }
   .arr-foot { flex-direction: column; align-items: flex-start; }
@@ -1015,7 +1214,7 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 }
 
 /* ------------------------------------------------------------------
-   10. Reduced motion
+   11. Reduced motion
 ------------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {

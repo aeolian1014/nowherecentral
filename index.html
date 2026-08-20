@@ -210,6 +210,54 @@
   </div>
 </section>
 
+<!-- ========================= NIGHT SERVICE ======================== -->
+<div id="nightfall" aria-hidden="true"></div>
+
+<div id="nightclock" aria-hidden="true">
+  <span class="nc-time">--:--</span>
+  <span class="nc-where">Nowhere Central</span>
+  <span class="nc-timer"></span>
+</div>
+
+<aside id="night" aria-hidden="true" aria-label="Night service">
+  <header class="night-head">
+    <span class="moon">☾</span>
+    <h2>Night Service</h2>
+    <button id="night-close" type="button" aria-label="Close night service">✕</button>
+  </header>
+
+  <p class="night-lede">
+    The station stays open. The screen puts itself out after a minute;
+    move anything to bring it back.
+  </p>
+
+  <div class="night-row">
+    <label for="vol">Volume</label>
+    <input type="range" id="vol" min="0" max="100" step="1" value="75"
+           aria-label="Volume">
+    <output id="vol-out">75</output>
+  </div>
+
+  <div class="night-row col">
+    <span class="night-label">Sleep timer</span>
+    <div class="chips" id="timer-chips" role="group" aria-label="Sleep timer">
+      <button type="button" data-min="0" aria-pressed="true">Off</button>
+      <button type="button" data-min="15">15m</button>
+      <button type="button" data-min="30">30m</button>
+      <button type="button" data-min="60">60m</button>
+      <button type="button" data-min="90">90m</button>
+    </div>
+  </div>
+
+  <p class="night-status" id="night-status">Station open. No timer set.</p>
+
+  <p class="night-fineprint">
+    Keep this tab in front. Browsers suspend audio in background tabs and
+    on locked phones — this is a page, not an app, and it cannot get
+    around that.
+  </p>
+</aside>
+
 <!-- =============================== PA ============================= -->
 <div id="pa" role="status" aria-live="polite"><span class="spk"></span><span class="txt"></span></div>
 
