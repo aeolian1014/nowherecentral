@@ -117,7 +117,7 @@ click per flap (throttled, or 2,400 would arrive at once), and
 
 Everything about it is a distance problem. Air absorbs high frequencies
 over a kilometre, so the whole train runs through one lowpass that opens
-as it nears and closes as it goes; the level follows an inverse-square
+as it nears and closes as it goes; the level follows a
 swell rather than a fade; and most of it is sent to the hall, because at
 that range you hear the valley more than the engine.
 
@@ -125,21 +125,25 @@ that range you hear the valley more than the engine.
   `[0, 0.238, 0.5, 0.762]` with uneven strengths. The two cylinders of a
   steam engine are never quite matched, and that limp in the rhythm is
   the whole reason it sounds like a steam engine rather than a machine.
-- **Whistle** — five pipes on a minor stack with shallow vibrato, a
-  slow attack because steam takes a moment to find the pipes, and a
-  band of breath noise around the tone. Without the breath it is an
-  organ.
-- **Bell** — a small hand bell, not a church tower. This one is easy to
-  get wrong: a low fundamental with strong clangorous partials (2.01,
-  3.04, 4.19, 5.51) ringing for two or three seconds under reverb is
-  exactly how you synthesise a bell tolling in an empty church, and it
-  sounds haunted. A locomotive bell is bright (~1050 Hz), its partials
-  sit near plain octaves and fifths, everything above the fundamental
-  is gone inside half a second, and there is a clapper tick on the
-  attack — without which it is a synth tone rather than metal.
+- **Horn** — five pipes with shallow vibrato, a slow attack because
+  steam takes a moment to find the pipes, and a slight pitch rise on
+  the attack and sag on the release as pressure builds and falls.
+  Two things decide whether it lands as *big* or as *eerie*, and
+  neither is volume: the chord must be a major stack (a minor one is
+  beautiful but reads as dread), and there must be a band of breath
+  noise around the tone, or it is a church organ.
 
-The first train comes **10 seconds** after the concourse opens, and after
-that there is roughly **half a minute of quiet** between one pass and the
+  It sounds the real grade-crossing signal — long, long, short, LONG —
+  worked backwards from the closest approach so the sustained one
+  lands as the engine goes past.
+
+There is deliberately **no bell**. A bell is a hard thing to make
+sound casual: get the partials even slightly clangorous and it tolls,
+and a tolling bell under reverb is the sound of an empty church at
+midnight. The horn carries the whole announcement instead.
+
+The first train comes **15 seconds after the announcer finishes**, and
+after that there is roughly **half a minute of quiet** between one pass and the
 next. The concourse shader sweeps light across the floor every 22
 seconds, and each pass is aimed at one of those sweeps, so the light
 crossing the floor and the engine going through are the same event.
@@ -158,6 +162,28 @@ timer rather than all at once, so a forty-second pass never holds more
 than a handful of live nodes, and it survives a throttled tab.
 
 Off until you ask for it — press **M** or use the toggle.
+
+### The announcer — `js/voice.js`
+
+The one woman who works here is the browser's own speech synthesiser.
+She costs nothing to download, and she reads the board as it actually
+stands — including departure times that did not exist when this was
+written.
+
+Enter the concourse and you get the two-tone chime, then her welcome
+with the next service, its time and its platform. Fifteen seconds after
+she finishes, the first train comes through. She also calls each
+departure as you take it.
+
+Voice selection walks a preference list (Aria, Jenny, Sonia, Samantha,
+Zira, Hazel…) and falls back to any English voice that isn't obviously
+male. Names come off the board in caps, because that is how a split-flap
+works, so she gets them back in title case — speech engines read caps as
+initialisms. Times are spelt out too: "one thirty-nine", not "01:39".
+
+Web Speech output cannot be routed into an AudioContext, so she can't be
+given the station's reverb. The room ducks under her instead, which is
+what a real PA does anyway.
 
 #### Writing a pack
 

@@ -6,6 +6,7 @@ import { DESTINATIONS, STATUSES, LOST_AND_FOUND, NOTICES } from './data.js';
 import { FlapLine } from './board.js';
 import { Renderer } from './gl.js';
 import { Station } from './audio.js';
+import { Announcer, welcomeLine, departureLine } from './voice.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -41,6 +42,7 @@ function tween({ from, to, dur, ease = easeInOut, onUpdate, onDone }) {
    ================================================================ */
 const gl = new Renderer($('#gl'));
 const station = new Station();
+const announcer = new Announcer();
 const rows = [];
 let entered = false;
 let inTransit = false;
@@ -100,10 +102,22 @@ function enterStation() {
   $('#concourse').inert = false;
   $('#topbar').inert = false;
   document.body.classList.add('ready');
-  setTimeout(() => {
-    announce('Welcome to Nowhere Central. The board is live.');
+
+  /* The arrival sequence: two-tone chime, then the announcer reads the
+     next service off the board she is standing under. Fifteen seconds
+     after she finishes, the first train comes through. */
+  setTimeout(async () => {
     station.chime();
+    await wait(2100);                       // let the chime ring out
+    buildBoard();
+    const next = rows[0];
+    await announce(
+      'Welcome to Nowhere Central. The board is live.',
+      { speak: next ? welcomeLine(next.d, next.depart) : 'Welcome to Nowhere Central.' }
+    );
+    trainDueIn(15000);
   }, 900);
+
   setTimeout(() => {
     buildBoard();
     // if the board is already on screen there is nothing to wait for
@@ -203,7 +217,9 @@ async function depart_to(id) {
 
   station.enable();
   station.chime();
-  announce(`Platform ${d.platform}. The service to ${d.name} is ready to depart.`);
+  announce(`Platform ${d.platform}. The service to ${d.name} is ready to depart.`, {
+    speak: departureLine(d),
+  });
 
   const shell = $('#board-shell');
   $$('.board-row').forEach((el) => el.classList.remove('chosen'));
@@ -364,12 +380,28 @@ function clock() {
 }
 
 let paTimer;
-function announce(text) {
+
+/**
+ * @param {string} text shown on the PA strip
+ * @param {{speak?:string}} opts when `speak` is given, she says that
+ *   instead — the written line is terse, the spoken one is not.
+ */
+function announce(text, opts = {}) {
   const pa = $('#pa');
   $('.txt', pa).textContent = text;
   pa.classList.add('show');
   clearTimeout(paTimer);
-  paTimer = setTimeout(() => pa.classList.remove('show'), 5200);
+  paTimer = setTimeout(() => pa.classList.remove('show'), opts.speak ? 9000 : 5200);
+  if (opts.speak && station.enabled) return speak(opts.speak);
+  return Promise.resolve(false);
+}
+
+/** She talks over the room, so the room gets out of the way. */
+function speak(line) {
+  return announcer.say(line, {
+    onStart: () => station.duck(0.28, 0.35),
+    onEnd: () => station.duck(1, 1.2),
+  });
 }
 
 function notices() {
@@ -532,11 +564,19 @@ function toggleNight(force) {
     station.enable();
     updateSoundBtn();
     setDim(0);
-    announce('Night service. The station stays open.');
+    // hand the audio to a real media element so the browser stops
+    // throttling us the moment the tab loses focus
+    const bg = station.goBackground(true);
+    announce(
+      bg
+        ? 'Night service. The station stays open — you can leave the tab.'
+        : 'Night service. Keep this tab in front.'
+    );
   } else {
     setDim(0);
     setTimer(0);
     night.ending = false;
+    station.goBackground(false);
     station.setVolume(station.volume);
     gl.ok && gl.setQuality(gl.quality);
     announce('Night service ended.');
@@ -569,14 +609,22 @@ function setTimer(minutes) {
 
 function paintNightStatus() {
   const el = $('#night-status');
+  const fill = $('#nr-fill');
   if (!el) return;
-  if (!night.on) { el.textContent = 'Station open. No timer set.'; return; }
-  if (!night.minutes) { el.textContent = 'Station open. No timer set.'; return; }
+
+  if (!night.on || !night.minutes) {
+    el.textContent = 'Open · no timer';
+    if (fill) fill.style.height = '0%';
+    return;
+  }
+  const total = night.minutes * 60000;
   const left = Math.max(0, night.endsAt - Date.now());
-  if (night.ending) { el.textContent = 'Last service. Fading out.'; return; }
+  if (fill) fill.style.height = `${(left / total) * 100}%`;
+
+  if (night.ending) { el.textContent = 'Fading out'; return; }
   const m = Math.floor(left / 60000);
   const s = Math.floor((left % 60000) / 1000);
-  el.textContent = `Last service in ${m}:${String(s).padStart(2, '0')}.`;
+  el.textContent = `${m}:${String(s).padStart(2, '0')} left`;
 }
 
 function nightTick() {
@@ -665,18 +713,20 @@ function nightWiring() {
    sweep the light will make, so they arrive together.
    ================================================================ */
 const SWEEP_PERIOD = 1 / 0.0455;
-const FIRST_TRAIN = 10000;               // ms after the concourse opens
 const QUIET_BETWEEN = [26000, 38000];    // silence between one pass and the next
 
-function trainWatch() {
-  let due = 0;
-  let armed = false;
+let trainDue = Infinity;
+/** The announcer sets the first one going once she has finished. */
+function trainDueIn(ms) {
+  trainDue = performance.now() + ms;
+}
 
+function trainWatch() {
   setInterval(() => {
     if (!entered || !gl.ok || !station.enabled) return;
-    if (!armed) { armed = true; due = performance.now() + FIRST_TRAIN; }
     if (gl.current !== 'concourse' || document.hidden || inTransit) return;
-    if (performance.now() < due) return;
+    if (announcer.speaking) return;        // never talk over her
+    if (performance.now() < trainDue) return;
 
     /* Aim the closest approach at a sweep peak, so the light crossing
        the concourse floor and the engine going through are the same
@@ -688,7 +738,7 @@ function trainWatch() {
     station.steamTrain({ peak: peakIn, far: 0.5 + Math.random() * 0.22 });
 
     // next one starts a short quiet after this one has gone
-    due = performance.now() + peakIn * 2000 + rnd(...QUIET_BETWEEN);
+    trainDue = performance.now() + peakIn * 2000 + rnd(...QUIET_BETWEEN);
   }, 500);
 }
 
@@ -699,7 +749,7 @@ function keys() {
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { currentDest ? returnHome() : null; return; }
     if (!entered && (e.key === 'Enter' || e.key === ' ')) { enterStation(); return; }
-    if (e.key === 'm' || e.key === 'M') { station.toggle(); updateSoundBtn(); return; }
+    if (e.key === 'm' || e.key === 'M') { station.toggle(); if (!station.enabled) announcer.cancel(); updateSoundBtn(); return; }
     if (e.key === 'q' || e.key === 'Q') {
       if (!gl.ok) return;
       announce(`Rendering quality — ${gl.setQuality(gl.quality + 1)}`);
@@ -748,7 +798,11 @@ function init() {
 
   $('#boot-cta').addEventListener('click', enterStation);
   $('#arr-back').addEventListener('click', returnHome);
-  $('#sound-btn').addEventListener('click', () => { station.toggle(); updateSoundBtn(); });
+  $('#sound-btn').addEventListener('click', () => {
+    station.toggle();
+    if (!station.enabled) announcer.cancel();
+    updateSoundBtn();
+  });
 
   document.addEventListener('visibilitychange', () => {
     if (!gl.ok) return;
@@ -757,34 +811,24 @@ function init() {
 
   // signalbox: for anyone who opens the console
   window.NC = {
-    gl, station, rows, night,
+    gl, station, announcer, rows, night,
     go: depart_to,
     home: returnHome,
     sleep: toggleNight,
     /** NC.train() — hear one now, without waiting. NC.train(0.2) = close. */
     train: (far = 0.6) => station.steamTrain({ peak: 18, far }),
     /**
-     * NC.type(opsz, wght) — dial the display serif live and see it on
-     * your own screen. opsz 96 is the thinnest, most dramatic cut; lower
-     * is sturdier. wght 400–700 thickens the hairline without flattening
-     * the contrast. Call with no arguments to read the current pair.
+     * NC.type(wght) — dial the display serif live on your own screen.
+     * 400 is the elegant end, 600 the sturdy end. No arguments reads
+     * the current value.
      */
-    type: (opsz, wght) => {
-      const r = document.documentElement.style;
-      if (opsz === undefined) {
-        const c = getComputedStyle(document.documentElement);
-        return {
-          opsz: +c.getPropertyValue('--display-opsz'),
-          wght: +c.getPropertyValue('--display-wght'),
-        };
+    type: (wght) => {
+      if (wght === undefined) {
+        return +getComputedStyle(document.documentElement).getPropertyValue('--display-wght');
       }
-      r.setProperty('--display-opsz', String(opsz));
-      if (wght !== undefined) r.setProperty('--display-wght', String(wght));
-      $$('.hero-title, .hero-title em').forEach((el) => {
-        el.style.removeProperty('--display-opsz');
-        el.style.removeProperty('--display-wght');
-      });
-      return `opsz ${opsz} / wght ${wght ?? 'unchanged'}`;
+      $$('[style*="--display-wght"]').forEach((el) => el.style.removeProperty('--display-wght'));
+      document.documentElement.style.setProperty('--display-wght', String(wght));
+      return `weight ${wght}`;
     },
   };
 

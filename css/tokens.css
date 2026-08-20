@@ -54,7 +54,7 @@
   --flap-seam: rgba(0, 0, 0, 0.85);
 
   /* ---- type ------------------------------------------------------ */
-  --font-display: 'Bodoni Moda', 'Didot', 'Times New Roman', serif;
+  --font-display: 'Bodoni Moda', 'Didot', Georgia, 'Times New Roman', serif;
   --font-ui: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
@@ -74,11 +74,12 @@
   --tracking-wide: 0.18em;
   --tracking-wider: 0.34em;
 
-  /* Bodoni is a Didone. Left on `font-optical-sizing: auto` it picks the
-     display cut at large sizes, whose hairlines are the thinnest the
-     family has — and light-on-dark thins them again optically. Pin a
-     *text* optical size and put the weight back to keep the thin strokes
-     on screen. Lower opsz = sturdier hairline. */
+  /* Bodoni is a Didone: on `font-optical-sizing: auto` it picks the
+     display cut at large sizes, whose hairlines are the finest in the
+     family, and light-on-dark thins them again. Pinning the optical
+     size and adding a little weight keeps the thin strokes on screen
+     without flattening the contrast that makes it a Bodoni.
+     Dial both live with NC.type(opsz, wght). */
   --display-opsz: 18;
   --display-wght: 560;
 

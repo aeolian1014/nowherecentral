@@ -35,9 +35,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 ::selection { background: var(--accent); color: var(--ink-1000); }
 
-/* Everything set in the display serif gets a pinned optical size, and a
-   soft dark halo so the hairlines have something to sit against when a
-   light shaft passes behind them. */
+/* Every use of the display serif shares one optical-size and weight
+   pair. No shadow and no stroke — just the axes the family provides. */
 .hero-title,
 .sec h2,
 .board-head h2,
@@ -48,13 +47,6 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #nightclock .nc-time {
   font-optical-sizing: none;
   font-variation-settings: 'opsz' var(--display-opsz), 'wght' var(--display-wght);
-}
-
-.hero-title,
-#arr-name,
-#arr-strap,
-.sec h2 {
-  text-shadow: 0 1px 2px rgba(5, 7, 10, 0.55), 0 4px 34px rgba(5, 7, 10, 0.75);
 }
 
 :focus-visible {
@@ -339,12 +331,12 @@ body.no-gl {
 
 .hero-title {
   font-family: var(--font-display);
+  --display-opsz: 58;
   /* A Didone's hairline is the first thing to go on a dark ground.
      High opsz = the display cut = maximum thick/thin drama and the
      finest hairline; weight is what puts thickness back without
      flattening the contrast. This pair is the dial — try values with
      NC.type(opsz, wght) in the console and keep the ones you like. */
-  --display-opsz: 58;
   --display-wght: 470;
   font-size: var(--fs-mega);
   line-height: 0.84;
@@ -431,7 +423,7 @@ body.no-gl {
 .board-head h2 {
   font-family: var(--font-display);
   --display-opsz: 24;
-  --display-wght: 520;
+  --display-wght: 500;
   font-size: var(--fs-2xl);
   line-height: 1;
   letter-spacing: -0.01em;
@@ -666,13 +658,13 @@ body.no-gl {
 .sec h2 {
   font-family: var(--font-display);
   --display-opsz: 24;
-  --display-wght: 520;
+  --display-wght: 500;
   font-size: var(--fs-2xl);
   line-height: 1.02;
   letter-spacing: -0.015em;
   margin-top: var(--sp-4);
 }
-.sec h2 em { font-style: italic; color: var(--accent); --display-wght: 540; }
+.sec h2 em { font-style: italic; color: var(--accent); --display-wght: 520; }
 
 .prose p {
   color: var(--bone-300);
@@ -860,7 +852,7 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 #arr-name {
   font-family: var(--font-display);
   --display-opsz: 16;
-  --display-wght: 580;
+  --display-wght: 500;
   font-size: var(--fs-3xl);
   line-height: 0.92;
   letter-spacing: -0.02em;
@@ -871,7 +863,7 @@ body.away .topbar { opacity: 0; pointer-events: none; }
   font-family: var(--font-display);
   font-style: italic;
   --display-opsz: 22;
-  --display-wght: 580;
+  --display-wght: 500;
   font-size: var(--fs-xl);
   color: var(--accent);
   margin-bottom: var(--sp-5);
@@ -1063,87 +1055,128 @@ body.dim-2 #nightclock { opacity: 1; }
   color: #1b1712;
 }
 
+/* ---- the rail ----------------------------------------------------
+   Not a dialog but a platform edge: a narrow strip flush to the right
+   of the window, everything on it running vertically.
+------------------------------------------------------------------ */
+
 #night {
   position: fixed;
   z-index: 47;
-  right: var(--gutter);
-  bottom: var(--sp-6);
-  width: min(360px, calc(100vw - var(--gutter) * 2));
-  padding: var(--sp-5);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
-  background: linear-gradient(180deg, rgba(11, 14, 20, 0.97), rgba(5, 7, 10, 0.98));
-  box-shadow: var(--e-2);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 92px;
+  border-left: 1px solid var(--border-strong);
+  background: linear-gradient(180deg, rgba(9, 12, 17, 0.96), rgba(5, 7, 10, 0.985));
+  box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 1);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(12px);
-  transition: opacity var(--d-med) var(--ease-out), transform var(--d-med) var(--ease-out),
+  transform: translateX(100%);
+  transition: opacity var(--d-med) var(--ease-out), transform 520ms var(--ease-out),
     visibility var(--d-med);
 }
 #night.open { opacity: 1; visibility: visible; transform: none; }
+
+/* the page steps aside for the rail instead of being covered by it */
+.stage, .topbar { transition: padding-right var(--d-med) var(--ease-out); }
+body.night .stage { padding-right: 92px; }
+body.night .topbar { padding-right: calc(var(--gutter) + 92px); }
+/* the rail takes the width the labels were using */
+.topbar .brand, .tb-btn { white-space: nowrap; }
+body.night .tb-label, body.night #sound-label { display: none; }
+body.night .topbar .center { display: none; }
 body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
 
-.night-head {
+/* the night draining away, bottom to top */
+.nr-drain {
+  position: absolute;
+  inset: 0 auto 0 -1px;
+  width: 2px;
+  background: rgba(255, 179, 71, 0.10);
+  overflow: hidden;
+}
+#nr-fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0;
+  background: linear-gradient(180deg, transparent, var(--accent));
+  box-shadow: 0 0 12px rgba(255, 179, 71, 0.6);
+  transition: height 1s linear;
+}
+
+.nr-inner {
+  position: relative;
+  height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-4);
+  gap: var(--sp-5);
+  padding: var(--sp-4) 0 var(--sp-5);
+  overflow: hidden;
 }
-.night-head .moon { color: var(--accent); font-size: var(--fs-lg); line-height: 1; }
-.night-head h2 {
-  flex: 1;
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  font-weight: 400;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--text-muted);
+
+.nr-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
 }
+.nr-moon { color: var(--accent); font-size: var(--fs-lg); line-height: 1; }
 #night-close {
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-2xs);
   color: var(--text-dim);
-  padding: 2px 6px;
+  padding: 3px 7px;
   border-radius: var(--r-sm);
   transition: color var(--d-fast);
 }
 #night-close:hover { color: var(--accent); }
 
-.night-lede {
-  font-size: var(--fs-sm);
-  color: var(--bone-300);
-  margin-bottom: var(--sp-5);
-  line-height: 1.6;
-}
-
-.night-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding-block: var(--sp-3);
-  border-top: 1px solid var(--border);
-}
-.night-row.col { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
-.night-row label,
-.night-label {
+.nr-title {
+  writing-mode: vertical-rl;
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  letter-spacing: var(--tracking-wide);
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
   color: var(--text-muted);
   white-space: nowrap;
 }
-.night-row output {
+
+.nr-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border);
+  width: 56px;
+}
+.nr-label {
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  color: var(--accent);
-  width: 2.4em;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
 }
 
+/* A rotated wrapper rather than writing-mode on the input: vertical
+   range support is still uneven, and this behaves identically everywhere. */
+.vol-wrap {
+  position: relative;
+  width: 26px;
+  height: 150px;
+}
+/* Absolute + explicit centring: a grid item wider than its area does
+   not centre reliably, and this one is 150px inside 26px. */
 #vol {
-  flex: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150px;
+  transform: translate(-50%, -50%) rotate(-90deg);
   -webkit-appearance: none;
   appearance: none;
   height: 2px;
@@ -1167,17 +1200,21 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   border-radius: 50%;
   background: var(--accent);
 }
+#vol-out {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
 
-.chips { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.chips { display: flex; flex-direction: column; gap: 4px; width: 100%; }
 .chips button {
-  flex: 1;
-  min-width: 3.4em;
-  padding: 7px 4px;
+  padding: 6px 0;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
   transition: all var(--d-fast) var(--ease-std);
 }
@@ -1188,22 +1225,16 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   border-color: var(--accent);
 }
 
-.night-status {
-  margin-top: var(--sp-4);
-  padding-top: var(--sp-4);
-  border-top: 1px solid var(--border);
+.nr-status {
+  margin-top: auto;
+  writing-mode: vertical-rl;
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--accent);
-  line-height: 1.7;
-}
-.night-fineprint {
-  margin-top: var(--sp-3);
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  line-height: 1.7;
-  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .tb-btn .moon { font-size: var(--fs-sm); line-height: 1; }
@@ -1235,7 +1266,13 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   .hero-title { line-height: 0.9; }
   .topbar .right { gap: var(--sp-2); }
   #sound-label, .tb-label { display: none; }
-  #night { right: var(--sp-4); left: var(--sp-4); width: auto; }
+  #night { width: 74px; }
+  body.night .stage { padding-right: 74px; }
+  body.night .topbar { padding-right: calc(var(--gutter) + 74px); }
+  .nr-block { width: 46px; }
+  .nr-inner { gap: var(--sp-4); }
+  .vol-wrap { height: 108px; }
+  #vol { width: 108px; }
   #nightclock { inset: auto auto var(--sp-8) var(--sp-4); }
   .stat { padding: var(--sp-4); }
   .arr-inner { padding-top: var(--sp-7); }

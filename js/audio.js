@@ -328,6 +328,114 @@ export class Station {
     return true;
   }
 
+  /* ------------------------------------------------------------------
+     Staying alive in the background
+
+     A bare AudioContext is not treated as media: hide the tab for five
+     minutes and Chrome applies intensive throttling, clamping timers to
+     once a minute, which starves the schedulers. Routing the graph
+     through a MediaStream into a real <audio> element makes the browser
+     class the page as *playing media* — the tab is exempted from
+     throttling, the OS shows transport controls, and on a phone it can
+     survive the screen locking.
+
+     Only switched on for night service: the media element adds latency,
+     which matters for flap clicks and not at all for a drone.
+  ------------------------------------------------------------------ */
+
+  goBackground(on) {
+    if (!this.ready) return false;
+    if (on === !!this._bg) return !!this._bg;
+
+    try {
+      if (on) {
+        const dest = this.ctx.createMediaStreamDestination();
+        this.limiter.disconnect();          // or it plays twice
+        this.limiter.connect(dest);
+
+        const el = document.createElement('audio');
+        el.srcObject = dest.stream;
+        el.autoplay = true;
+        el.loop = true;
+        el.setAttribute('playsinline', '');
+        el.style.display = 'none';
+        document.body.appendChild(el);
+        el.play().catch(() => {});
+
+        this._bg = { dest, el };
+        this._mediaSession();
+      } else {
+        const { el, dest } = this._bg;
+        this.limiter.disconnect();
+        this.limiter.connect(this.ctx.destination);
+        try { el.pause(); el.srcObject = null; el.remove(); dest.disconnect(); } catch (e) {}
+        this._bg = null;
+        if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+      }
+      return !!this._bg;
+    } catch (e) {
+      // if anything about the stream path fails, fall back to plain output
+      try { this.limiter.disconnect(); this.limiter.connect(this.ctx.destination); } catch (e2) {}
+      this._bg = null;
+      return false;
+    }
+  }
+
+  _mediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    const ms = navigator.mediaSession;
+    try {
+      ms.metadata = new MediaMetadata({
+        title: 'Night Service',
+        artist: 'Nowhere Central',
+        album: 'Services that do not arrive',
+        artwork: [{ src: this._artwork(512), sizes: '512x512', type: 'image/png' }],
+      });
+      ms.playbackState = 'playing';
+      ms.setActionHandler('pause', () => { this.enabled && this.toggle(); ms.playbackState = 'paused'; });
+      ms.setActionHandler('play', () => { this.enable(); ms.playbackState = 'playing'; });
+      ms.setActionHandler('stop', () => { this.enabled && this.toggle(); });
+    } catch (e) {}
+  }
+
+  /** lock-screen art, drawn rather than downloaded */
+  _artwork(n) {
+    const c = document.createElement('canvas');
+    c.width = c.height = n;
+    const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, n, n);
+    g.addColorStop(0, '#11161f');
+    g.addColorStop(1, '#05070a');
+    x.fillStyle = g;
+    x.fillRect(0, 0, n, n);
+    const glow = x.createRadialGradient(n * 0.3, n * 0.2, 0, n * 0.3, n * 0.2, n * 0.8);
+    glow.addColorStop(0, 'rgba(255,179,71,0.30)');
+    glow.addColorStop(1, 'rgba(255,179,71,0)');
+    x.fillStyle = glow;
+    x.fillRect(0, 0, n, n);
+    x.fillStyle = '#ffb347';
+    x.font = `${n * 0.34}px Georgia, serif`;
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.fillText('◈', n / 2, n * 0.44);
+    x.fillStyle = '#f2efe6';
+    x.font = `${n * 0.072}px monospace`;
+    x.fillText('NOWHERE CENTRAL', n / 2, n * 0.72);
+    return c.toDataURL('image/png');
+  }
+
+  /**
+   * Pull the room down and let it back up. Used when the announcer
+   * speaks, since her voice cannot be routed through this graph.
+   * @param {number} to 0..1 @param {number} ramp seconds
+   */
+  duck(to, ramp = 0.4) {
+    if (!this.ready) return;
+    const now = this.ctx.currentTime;
+    this.bus.gain.cancelScheduledValues(now);
+    this.bus.gain.setTargetAtTime(to, now, ramp / 3);
+  }
+
   /** The sleep timer's ending: a long, gentle taper to silence. */
   fadeOut(seconds = 90) {
     if (!this.ready || !this.enabled) return;
@@ -596,108 +704,80 @@ export class Station {
   }
 
   /**
-   * The brass bell on the boiler.
+   * The horn. Deep, warm, and consonant.
    *
-   * This is a small hand bell, not a church tower. Get that wrong and
-   * it turns funereal immediately: a low fundamental with strong
-   * clangorous partials (2.01, 3.04, 4.19, 5.51) ringing for two or
-   * three seconds under reverb is exactly a tolling bell in an empty
-   * church. A locomotive bell is bright, its partials are close to
-   * plain octaves, and everything above the fundamental is gone inside
-   * half a second — which is what makes it read as cheerful.
+   * Two things decide whether this lands as *big* or as *eerie*, and
+   * neither is volume:
+   *
+   * - **The chord.** A minor stack (root, minor third, fifth, minor
+   *   seventh) is the mournful one — beautiful, but it reads as dread.
+   *   This is a major stack with an octave and a twelfth on top, which
+   *   is the warm, wide, carrying sound.
+   * - **The breath.** A band of noise around the tone is the whole
+   *   difference between a horn and a church organ.
+   *
+   * The slight pitch rise on the attack and sag on the release is
+   *   pressure building and falling in the pipes. Leave it out and it
+   *   sounds synthetic immediately.
    */
-  _locoBell(when, strength) {
+  _horn(when, dur, level = 1) {
     const ctx = this.ctx;
-    const f = rand(950, 1130);
-    // [ratio, level, decay]
-    const parts = [
-      [1.0, 1.0, 0.90],
-      [2.0, 0.32, 0.40],
-      [2.99, 0.10, 0.15],
-      [4.05, 0.04, 0.09],
-    ];
-    for (const [r, a, decay] of parts) {
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = f * r * rand(0.999, 1.001);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, when);
-      g.gain.linearRampToValueAtTime(strength * a, when + 0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001, when + decay);
-      o.connect(g).connect(this._trainBus);
-      o.start(when);
-      o.stop(when + decay + 0.05);
-    }
-
-    // the clapper itself — a physical tick, or it is a synth tone
-    const src = ctx.createBufferSource();
-    src.buffer = this.noise;
-    src.playbackRate.value = rand(0.9, 1.2);
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = f * 2.1;
-    bp.Q.value = 0.7;
-    const cg = ctx.createGain();
-    cg.gain.setValueAtTime(strength * 0.45, when);
-    cg.gain.exponentialRampToValueAtTime(0.0001, when + 0.022);
-    src.connect(bp).connect(cg).connect(this._trainBus);
-    src.start(when, Math.random() * 2);
-    src.stop(when + 0.06);
-  }
-
-  /** a multi-chime whistle: several pipes, a minor stack, and breath */
-  _whistle(when, dur) {
-    const ctx = this.ctx;
-    const root = rand(186, 244);
-    const ratios = [1, 1.19, 1.5, 1.78, 2.38];
+    const root = rand(138, 176);
+    const ratios = [1, 1.26, 1.5, 2.0, 3.0];
+    const weights = [1, 0.6, 0.7, 0.42, 0.14];
 
     const out = ctx.createGain();
+    const peak = 0.34 * level;
     out.gain.setValueAtTime(0.0001, when);
-    // steam takes a moment to find the pipes
-    out.gain.exponentialRampToValueAtTime(0.26, when + rand(0.3, 0.55));
-    out.gain.setValueAtTime(0.26, when + dur * 0.7);
+    out.gain.exponentialRampToValueAtTime(peak, when + rand(0.22, 0.38));
+    out.gain.setValueAtTime(peak, when + Math.max(0.4, dur * 0.72));
     out.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     out.connect(this._trainBus);
 
-    for (const r of ratios) {
+    ratios.forEach((r, i) => {
+      const f = root * r * rand(0.997, 1.003);
       const o = ctx.createOscillator();
       o.type = 'sawtooth';
-      o.frequency.value = root * r * rand(0.996, 1.004);
+      // pressure builds, then sags as the valve closes
+      o.frequency.setValueAtTime(f * 0.982, when);
+      o.frequency.linearRampToValueAtTime(f, when + 0.32);
+      o.frequency.setValueAtTime(f, when + dur * 0.8);
+      o.frequency.linearRampToValueAtTime(f * 0.99, when + dur);
 
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = root * r * 2.6;
+      lp.frequency.value = f * 3.2;
 
       const g = ctx.createGain();
-      g.gain.value = 0.30 / (ratios.length * Math.sqrt(r));
+      g.gain.value = (0.5 * weights[i]) / ratios.length;
 
-      // the waver of a whistle held open
+      // the waver of a horn held open
       const vib = ctx.createOscillator();
-      vib.frequency.value = rand(4.4, 6.4);
+      vib.frequency.value = rand(4.2, 5.8);
       const vg = ctx.createGain();
-      vg.gain.value = root * r * 0.005;
+      vg.gain.value = f * 0.004;
       vib.connect(vg).connect(o.frequency);
 
       o.connect(lp).connect(g).connect(out);
       o.start(when);
       vib.start(when);
-      o.stop(when + dur + 0.25);
-      vib.stop(when + dur + 0.25);
-    }
+      o.stop(when + dur + 0.3);
+      vib.stop(when + dur + 0.3);
+    });
 
-    // the breath around the tone — this is what stops it being an organ
+    // breath — without this it is an organ, not a horn
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     src.loop = true;
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = root * 2.4;
-    bp.Q.value = 1.1;
+    bp.frequency.value = root * 2.6;
+    bp.Q.value = 0.9;
     const bg = ctx.createGain();
-    bg.gain.value = 0.16;
+    bg.gain.value = 0.2;
     src.connect(bp).connect(bg).connect(out);
     src.start(when, Math.random() * 2);
-    src.stop(when + dur + 0.25);
+    src.stop(when + dur + 0.3);
   }
 
   /**
@@ -783,9 +863,17 @@ export class Station {
     rum.start(t0, Math.random() * 2);
     rum.stop(tEnd + 0.5);
 
-    /* ---- whistle: one long on the approach, sometimes a second ---- */
-    this._whistle(t0 + dur * rand(0.20, 0.30), rand(1.9, 3.1));
-    if (Math.random() < 0.55) this._whistle(t0 + dur * rand(0.52, 0.62), rand(1.1, 1.8));
+    /* ---- the horn ----
+       The real grade-crossing signal: long, long, short, LONG — with
+       the last one sustained through the crossing itself. Worked
+       backwards from the closest approach so the big one lands as the
+       engine goes past. A quieter blast on the way out.            */
+    const at = t0 + peak;
+    this._horn(at - 12.0, 2.8, 0.72);
+    this._horn(at - 8.0, 2.5, 0.82);
+    this._horn(at - 4.6, 0.9, 0.86);
+    this._horn(at - 2.4, 5.0, 1.0);
+    if (Math.random() < 0.7) this._horn(at + rand(7, 11), rand(2.2, 3.4), 0.55);
 
     /* ---- exhaust and bell, scheduled a little ahead at a time ----
        Four beats a revolution. The offsets are deliberately uneven:
@@ -795,11 +883,6 @@ export class Station {
     const punch = [1, 0.84, 0.96, 0.8];
     let nextRev = t0;
     let beat = 0;
-
-    const bellFrom = t0 + dur * 0.26;
-    const bellTo = t0 + dur * 0.68;
-    let nextBell = bellFrom;
-    let bellSwing = 0;
 
     this._train = setInterval(() => {
       if (!this.ready) return;
@@ -811,14 +894,6 @@ export class Station {
         if (at > t0) this._chuff(at, 0.34 * punch[beat] * rand(0.88, 1.12));
         beat++;
         if (beat === 4) { beat = 0; nextRev += revolution; }
-      }
-
-      while (nextBell < horizon && nextBell < bellTo) {
-        this._locoBell(nextBell, 0.16 * (bellSwing % 2 ? 0.92 : 1));
-        // briskly rung, with just enough unevenness to be a hand and
-        // not a metronome. Slow it down and it becomes a toll again.
-        nextBell += bellSwing % 2 ? 0.46 : 0.42;
-        bellSwing++;
       }
 
       if (now > tEnd + 1) {
