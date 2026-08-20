@@ -10,6 +10,7 @@ import { Station } from './audio.js';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const rnd = (a, b) => a + Math.random() * (b - a);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -655,24 +656,35 @@ function nightWiring() {
 }
 
 /* ================================================================
-   Something passes the platform
+   Something passes, a long way off
 
-   The concourse shader sweeps a light across the floor once every
-   ~22 seconds. This watches that same clock so the crossing bell and
-   the rail joints land with it instead of near it.
+   The concourse shader sweeps a light across the floor every ~22
+   seconds. Most of those pass in silence — whatever it is, it's too
+   far to hear. Every few minutes one of them is close enough, and
+   then the steam comes in with it: the sound is aimed at the exact
+   sweep the light will make, so they arrive together.
    ================================================================ */
 const SWEEP_PERIOD = 1 / 0.0455;
+const FIRST_TRAIN = [50000, 95000];      // ms after entering
+const THEN_EVERY = [150000, 300000];     // two and a half to five minutes
+
 function trainWatch() {
-  let lastCycle = -1;
+  let due = performance.now() + rnd(...FIRST_TRAIN);
+
   setInterval(() => {
-    if (!gl.ok || gl.current !== 'concourse' || !station.enabled) return;
-    if (document.hidden || inTransit) return;
-    const cycle = Math.floor(gl.time / SWEEP_PERIOD);
-    if (cycle === lastCycle) return;
-    lastCycle = cycle;
-    // the sweep peaks halfway through the cycle
-    station.trainPass(SWEEP_PERIOD * 0.5);
-  }, 400);
+    if (!entered || !gl.ok || !station.enabled) return;
+    if (gl.current !== 'concourse' || document.hidden || inTransit) return;
+    if (performance.now() < due) return;
+    due = performance.now() + rnd(...THEN_EVERY);
+
+    /* Aim the closest approach at a sweep peak. The shader's cycle is
+       fract(uTime * 0.0455) and the light crosses at the half. */
+    const now = gl.time;
+    const k = Math.ceil((now + 19 - SWEEP_PERIOD * 0.5) / SWEEP_PERIOD);
+    const peakIn = k * SWEEP_PERIOD + SWEEP_PERIOD * 0.5 - now;
+
+    station.steamTrain({ peak: peakIn, far: 0.74 + Math.random() * 0.2 });
+  }, 1000);
 }
 
 /* ================================================================

@@ -111,9 +111,38 @@ Three layers per world:
 
 Plus named cues: the platform chime, the departure sweep, one filtered
 click per flap (throttled, or 2,400 would arrive at once), and
-`trainPass()` — a level-crossing bell, a swelling approach and rail
-joints, timed against the same clock the shader uses to sweep light
-across the concourse floor, so the sound and the light arrive together.
+`steamTrain()`.
+
+#### The steam train
+
+Everything about it is a distance problem. Air absorbs high frequencies
+over a kilometre, so the whole train runs through one lowpass that opens
+as it nears and closes as it goes; the level follows an inverse-square
+swell rather than a fade; and most of it is sent to the hall, because at
+that range you hear the valley more than the engine.
+
+- **Exhaust** — four beats to a wheel revolution, at offsets
+  `[0, 0.238, 0.5, 0.762]` with uneven strengths. The two cylinders of a
+  steam engine are never quite matched, and that limp in the rhythm is
+  the whole reason it sounds like a steam engine rather than a machine.
+- **Whistle** — five pipes on a minor stack with shallow vibrato, a
+  slow attack because steam takes a moment to find the pipes, and a
+  band of breath noise around the tone. Without the breath it is an
+  organ.
+- **Bell** — brass, so inharmonic partials at 1, 2.01, 3.04, 4.19, 5.51
+  with the upper ones dying first. It swings, so alternate strikes fall
+  0.60s and 0.70s apart at slightly different strengths.
+
+The whole pass runs about three quarters of a minute, and it happens
+**every two and a half to five minutes**, not continuously. The concourse
+shader sweeps light across the floor every 22 seconds; most of those pass
+in silence — whatever it is, it's too far to hear. Occasionally one is
+close enough, and the sound is aimed at that exact sweep so the light and
+the steam arrive together.
+
+Voices are scheduled about two and a half seconds ahead on a rolling
+timer rather than all at once, so a forty-second pass never holds more
+than a handful of live nodes, and it survives a throttled tab.
 
 Off until you ask for it — press **M** or use the toggle.
 

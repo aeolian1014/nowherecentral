@@ -71,6 +71,14 @@
   --tracking-wide: 0.18em;
   --tracking-wider: 0.34em;
 
+  /* Bodoni is a Didone. Left on `font-optical-sizing: auto` it picks the
+     display cut at large sizes, whose hairlines are the thinnest the
+     family has — and light-on-dark thins them again optically. Pin a
+     *text* optical size and put the weight back to keep the thin strokes
+     on screen. Lower opsz = sturdier hairline. */
+  --display-opsz: 18;
+  --display-wght: 560;
+
   /* ---- space (4px base) ------------------------------------------ */
   --sp-1: 4px;
   --sp-2: 8px;

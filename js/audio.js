@@ -556,53 +556,225 @@ export class Station {
     this._bell(493.88, 0.10, 3.0, 0.38);
   }
 
-  /**
-   * Something passes the platform. Timed to arrive with the light
-   * sweeping across the concourse floor in the shader: the crossing
-   * bell starts far off, the rails build, it goes through at ~11s.
-   */
-  trainPass(peakIn = 11) {
-    if (!this.ready || !this.enabled || this.presetName !== 'concourse') return;
-    const ctx = this.ctx, t0 = ctx.currentTime;
+  /* ------------------------------------------------------------------
+     A steam locomotive, a long way off
 
-    // level-crossing bell — two alternating strikes, all the way through
-    const bellFor = peakIn + 5;
-    for (let i = 0; i * 0.62 < bellFor; i++) {
-      const d = i * 0.62;
-      const near = 1 - Math.min(1, Math.abs(d - peakIn) / peakIn);
-      this._bell(i % 2 ? 1244.5 : 1046.5, 0.014 + near * 0.030, 1.5, d);
+     Everything about this is a distance problem. Air absorbs high
+     frequencies over a kilometre, so the whole train runs through one
+     lowpass that opens as it nears and closes as it goes; the level
+     follows an inverse-square swell rather than a fade; and almost all
+     of it is sent to the hall, because at that range you hear the
+     valley more than the engine.
+
+     The exhaust is four beats to a wheel revolution, and the two
+     cylinders are never quite matched — that limp in the rhythm is the
+     whole reason a steam engine sounds like a steam engine.
+  ------------------------------------------------------------------ */
+
+  /** one exhaust beat */
+  _chuff(when, strength) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = rand(0.88, 1.16);
+
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 0.8;
+    // steam venting: a bright stab collapsing into a soft push
+    bp.frequency.setValueAtTime(rand(950, 1500), when);
+    bp.frequency.exponentialRampToValueAtTime(rand(240, 400), when + 0.20);
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(strength, when + 0.014);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + rand(0.22, 0.38));
+
+    src.connect(bp).connect(g).connect(this._trainBus);
+    src.start(when, Math.random() * 2);
+    src.stop(when + 0.45);
+  }
+
+  /** the brass bell on the boiler — inharmonic, and it swings */
+  _locoBell(when, strength) {
+    const ctx = this.ctx;
+    const f = rand(540, 660);
+    const parts = [[1, 1], [2.01, 0.46], [3.04, 0.26], [4.19, 0.14], [5.51, 0.07]];
+    for (const [r, a] of parts) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * r * rand(0.996, 1.004);
+      const g = ctx.createGain();
+      const decay = 2.6 / Math.pow(r, 0.7);       // upper partials die first
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.linearRampToValueAtTime(strength * a, when + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + decay);
+      o.connect(g).connect(this._trainBus);
+      o.start(when);
+      o.stop(when + decay + 0.05);
+    }
+  }
+
+  /** a multi-chime whistle: several pipes, a minor stack, and breath */
+  _whistle(when, dur) {
+    const ctx = this.ctx;
+    const root = rand(186, 244);
+    const ratios = [1, 1.19, 1.5, 1.78, 2.38];
+
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, when);
+    // steam takes a moment to find the pipes
+    out.gain.exponentialRampToValueAtTime(0.085, when + rand(0.3, 0.55));
+    out.gain.setValueAtTime(0.085, when + dur * 0.7);
+    out.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    out.connect(this._trainBus);
+
+    for (const r of ratios) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = root * r * rand(0.996, 1.004);
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = root * r * 2.6;
+
+      const g = ctx.createGain();
+      g.gain.value = 0.30 / (ratios.length * Math.sqrt(r));
+
+      // the waver of a whistle held open
+      const vib = ctx.createOscillator();
+      vib.frequency.value = rand(4.4, 6.4);
+      const vg = ctx.createGain();
+      vg.gain.value = root * r * 0.005;
+      vib.connect(vg).connect(o.frequency);
+
+      o.connect(lp).connect(g).connect(out);
+      o.start(when);
+      vib.start(when);
+      o.stop(when + dur + 0.25);
+      vib.stop(when + dur + 0.25);
     }
 
-    // the approach: low noise swelling, then falling away
+    // the breath around the tone — this is what stops it being an organ
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     src.loop = true;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.Q.value = 0.9;
-    lp.frequency.setValueAtTime(90, t0);
-    lp.frequency.exponentialRampToValueAtTime(900, t0 + peakIn);
-    lp.frequency.exponentialRampToValueAtTime(110, t0 + peakIn + 6);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.11, t0 + peakIn);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + peakIn + 7);
-    src.connect(lp).connect(g);
-    g.connect(this.bus);
-    const hg = ctx.createGain();
-    hg.gain.value = 0.55;
-    g.connect(hg).connect(this.hall);
-    src.start(t0, rand(0, 2));
-    src.stop(t0 + peakIn + 7.5);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = root * 2.4;
+    bp.Q.value = 1.1;
+    const bg = ctx.createGain();
+    bg.gain.value = 0.16;
+    src.connect(bp).connect(bg).connect(out);
+    src.start(when, Math.random() * 2);
+    src.stop(when + dur + 0.25);
+  }
 
-    // rail joints, densest as it goes through
-    const passMs = peakIn * 1000;
-    for (let i = 0; i < 34; i++) {
-      const off = (i / 34) * 2 - 1;                 // -1..1 around the pass
-      const at = passMs + off * 3400;
-      if (at < 0) continue;
-      setTimeout(() => this.click(0.03 + (1 - Math.abs(off)) * 0.075), at);
+  /**
+   * A steam train passes, a long way off. Roughly three quarters of a
+   * minute from first hearing it to losing it again.
+   *
+   * @param {{peak?:number, far?:number}} opts
+   *   peak — seconds until closest approach (align this with whatever
+   *   you want it to coincide with). far — 0..1, how distant.
+   */
+  steamTrain({ peak = rand(20, 25), far = rand(0.74, 0.94) } = {}) {
+    if (!this.ready || !this.enabled) return;
+    if (this._train) return;                       // one at a time
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.05;
+    const dur = peak * 2;
+    const tEnd = t0 + dur;
+
+    /* ---- the sub-graph everything runs through ---- */
+    const bus = ctx.createGain();
+    const air = ctx.createBiquadFilter();          // distance eats the highs
+    air.type = 'lowpass';
+    air.Q.value = 0.5;
+    const lvl = ctx.createGain();
+    lvl.gain.value = 0.0001;
+
+    bus.connect(air).connect(lvl);
+    lvl.connect(this.bus);
+    const send = ctx.createGain();
+    send.gain.value = 0.55 + far * 0.4;            // far away is mostly reverb
+    lvl.connect(send).connect(this.hall);
+
+    this._trainBus = bus;
+
+    /* ---- distance envelope: inverse square, not a fade ---- */
+    const N = 160;
+    const level = new Float32Array(N);
+    const cutoff = new Float32Array(N);
+    const top = 0.30 * (1 - far * 0.62);
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const d = Math.abs(t - 0.5) * 2;             // 0 at the pass, 1 at the ends
+      const near = 1 / (1 + 11 * d * d);
+      level[i] = Math.max(0.0001, top * near);
+      cutoff[i] = 240 + (1 - far) * 700 + near * (620 + (1 - far) * 2100);
     }
+    lvl.gain.setValueCurveAtTime(level, t0, dur);
+    air.frequency.setValueCurveAtTime(cutoff, t0, dur);
+
+    /* ---- the rumble underneath ---- */
+    const rum = ctx.createBufferSource();
+    rum.buffer = this.noise;
+    rum.loop = true;
+    const rlp = ctx.createBiquadFilter();
+    rlp.type = 'lowpass';
+    rlp.frequency.value = 150;
+    rlp.Q.value = 1.2;
+    const rg = ctx.createGain();
+    rg.gain.value = 0.55;
+    rum.connect(rlp).connect(rg).connect(bus);
+    rum.start(t0, Math.random() * 2);
+    rum.stop(tEnd + 0.5);
+
+    /* ---- whistle: one long on the approach, sometimes a second ---- */
+    this._whistle(t0 + dur * rand(0.20, 0.30), rand(1.9, 3.1));
+    if (Math.random() < 0.55) this._whistle(t0 + dur * rand(0.52, 0.62), rand(1.1, 1.8));
+
+    /* ---- exhaust and bell, scheduled a little ahead at a time ----
+       Four beats a revolution. The offsets are deliberately uneven:
+       a two-cylinder engine limps, and that limp is the sound.     */
+    const revolution = rand(1.08, 1.34);
+    const beats = [0, 0.238, 0.5, 0.762];
+    const punch = [1, 0.84, 0.96, 0.8];
+    let nextRev = t0;
+    let beat = 0;
+
+    const bellFrom = t0 + dur * 0.26;
+    const bellTo = t0 + dur * 0.68;
+    let nextBell = bellFrom;
+    let bellSwing = 0;
+
+    this._train = setInterval(() => {
+      if (!this.ready) return;
+      const now = ctx.currentTime;
+      const horizon = now + 2.5;                   // survives a throttled tab
+
+      while (nextRev <= tEnd && nextRev + beats[beat] * revolution < horizon) {
+        const at = nextRev + beats[beat] * revolution;
+        if (at > t0) this._chuff(at, 0.16 * punch[beat] * rand(0.88, 1.12));
+        beat++;
+        if (beat === 4) { beat = 0; nextRev += revolution; }
+      }
+
+      while (nextBell < horizon && nextBell < bellTo) {
+        this._locoBell(nextBell, 0.05 * (bellSwing % 2 ? 0.78 : 1));
+        // a swinging bell is never quite even
+        nextBell += bellSwing % 2 ? 0.70 : 0.60;
+        bellSwing++;
+      }
+
+      if (now > tEnd + 1) {
+        clearInterval(this._train);
+        this._train = null;
+        this._trainBus = null;
+        try { bus.disconnect(); lvl.disconnect(); send.disconnect(); } catch (e) {}
+      }
+    }, 450);
   }
 
   /** one flap of one character (also used for rail joints) */

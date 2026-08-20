@@ -19,7 +19,8 @@ body {
   font-family: var(--font-ui);
   font-size: var(--fs-base);
   line-height: 1.65;
-  -webkit-font-smoothing: antialiased;
+  /* deliberately NOT -webkit-font-smoothing: antialiased — on a dark
+     ground it thins every stroke, which is the last thing a Didone needs */
   text-rendering: optimizeLegibility;
   overflow-x: clip;
   cursor: none;
@@ -33,6 +34,28 @@ a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: none; }
 
 ::selection { background: var(--accent); color: var(--ink-1000); }
+
+/* Everything set in the display serif gets a pinned optical size, and a
+   soft dark halo so the hairlines have something to sit against when a
+   light shaft passes behind them. */
+.hero-title,
+.sec h2,
+.board-head h2,
+#arr-name,
+#arr-strap,
+.stat dd,
+.prose .drop,
+#nightclock .nc-time {
+  font-optical-sizing: none;
+  font-variation-settings: 'opsz' var(--display-opsz), 'wght' var(--display-wght);
+}
+
+.hero-title,
+#arr-name,
+#arr-strap,
+.sec h2 {
+  text-shadow: 0 1px 2px rgba(5, 7, 10, 0.55), 0 4px 34px rgba(5, 7, 10, 0.75);
+}
 
 :focus-visible {
   outline: 1px solid var(--focus);
@@ -316,7 +339,10 @@ body.no-gl {
 
 .hero-title {
   font-family: var(--font-display);
-  font-weight: 400;
+  /* Keeping the optical size around a text cut preserves the Didone
+     thick/thin drama; the weight is what puts the hairlines back. */
+  --display-opsz: 16;
+  --display-wght: 600;
   font-size: var(--fs-mega);
   line-height: 0.84;
   letter-spacing: -0.02em;
@@ -330,9 +356,11 @@ body.no-gl {
 }
 .hero-title .ln:nth-child(2) > span { transition-delay: 90ms; }
 .ready .hero-title .ln > span { transform: none; }
+/* the italic is cut finer still, so it gets more weight again */
 .hero-title em {
   font-style: italic;
   color: var(--accent);
+  --display-wght: 600;
 }
 
 .hero-sub {
@@ -399,7 +427,8 @@ body.no-gl {
 }
 .board-head h2 {
   font-family: var(--font-display);
-  font-weight: 400;
+  --display-opsz: 24;
+  --display-wght: 520;
   font-size: var(--fs-2xl);
   line-height: 1;
   letter-spacing: -0.01em;
@@ -633,13 +662,14 @@ body.no-gl {
 
 .sec h2 {
   font-family: var(--font-display);
-  font-weight: 400;
+  --display-opsz: 24;
+  --display-wght: 520;
   font-size: var(--fs-2xl);
   line-height: 1.02;
   letter-spacing: -0.015em;
   margin-top: var(--sp-4);
 }
-.sec h2 em { font-style: italic; color: var(--accent); }
+.sec h2 em { font-style: italic; color: var(--accent); --display-wght: 540; }
 
 .prose p {
   color: var(--bone-300);
@@ -826,7 +856,8 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 }
 #arr-name {
   font-family: var(--font-display);
-  font-weight: 400;
+  --display-opsz: 16;
+  --display-wght: 580;
   font-size: var(--fs-3xl);
   line-height: 0.92;
   letter-spacing: -0.02em;
@@ -836,6 +867,8 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 #arr-strap {
   font-family: var(--font-display);
   font-style: italic;
+  --display-opsz: 22;
+  --display-wght: 580;
   font-size: var(--fs-xl);
   color: var(--accent);
   margin-bottom: var(--sp-5);
