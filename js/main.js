@@ -396,11 +396,19 @@ function announce(text, opts = {}) {
   return Promise.resolve(false);
 }
 
-/** She talks over the room, so the room gets out of the way. */
+/**
+ * Her voice cannot be filtered — Web Speech bypasses the audio graph
+ * entirely — so the equipment gets built around her instead: the relay
+ * keys up, the carrier hiss and mains hum run underneath, and every
+ * word she reaches pulses the amplifier. The ear fuses a voice with a
+ * noise bed sharing its band and its timing and hears one tannoy.
+ */
 function speak(line) {
   return announcer.say(line, {
-    onStart: () => station.duck(0.28, 0.35),
-    onEnd: () => station.duck(1, 1.2),
+    gap: 640,
+    onStart: () => { station.duck(0.22, 0.3); station.paOpen(); },
+    onWord: () => station.paPulse(0.6 + Math.random() * 0.6),
+    onEnd: () => { station.paClose(); station.duck(1, 1.4); },
   });
 }
 
@@ -822,6 +830,9 @@ function init() {
      * 400 is the elegant end, 600 the sturdy end. No arguments reads
      * the current value.
      */
+    voices: () => announcer.list(),
+    voice: (frag) => announcer.use(frag),
+    say: (t) => speak(t),
     type: (wght) => {
       if (wght === undefined) {
         return +getComputedStyle(document.documentElement).getPropertyValue('--display-wght');

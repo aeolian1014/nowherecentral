@@ -424,6 +424,140 @@ export class Station {
     return c.toDataURL('image/png');
   }
 
+  /* ------------------------------------------------------------------
+     The public address rig
+
+     Her voice cannot be filtered. Web Speech writes to the output
+     device, past this graph entirely — there is no node to put a
+     bandpass on. What *can* be built is the equipment around her: the
+     relay closing, the carrier hiss of a horn speaker, mains hum from
+     an amplifier that has been warm since 1974, and the hall ringing
+     for a moment after she stops.
+
+     The ear fuses a voice with a noise bed that shares its band and
+     its timing, and hears one tannoy. Pulsing that bed on her word
+     boundaries is what makes the fusion hold — the hiss appears to be
+     carrying her rather than sitting beside her.
+  ------------------------------------------------------------------ */
+
+  /** the contactor in the amplifier rack */
+  _relay(level) {
+    const ctx = this.ctx, t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = rand(0.7, 1.1);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = rand(900, 1500);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(level, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    src.connect(lp).connect(g).connect(this.bus);
+    const hs = ctx.createGain();
+    hs.gain.value = 0.7;
+    g.connect(hs).connect(this.hall);
+    src.start(t, Math.random() * 2);
+    src.stop(t + 0.08);
+
+    // the thump of a big cone moving
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.09);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(level * 1.3, t);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(og).connect(this.bus);
+    o.start(t);
+    o.stop(t + 0.15);
+  }
+
+  /** key the system up: hiss, hum, and a relay */
+  paOpen() {
+    if (!this.ready || !this.enabled || this._pa) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(1, t + 0.05);
+    out.connect(this.bus);
+    const send = ctx.createGain();
+    send.gain.value = 0.6;
+    out.connect(send).connect(this.hall);
+
+    // carrier hiss, band-limited the way a horn speaker is
+    const hiss = ctx.createBufferSource();
+    hiss.buffer = this.noise;
+    hiss.loop = true;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 420;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3400;
+    const hg = ctx.createGain();
+    hg.gain.value = 0.042;
+    hiss.connect(hp).connect(lp).connect(hg).connect(out);
+    hiss.start(t, Math.random() * 2);
+
+    // mains hum and its second harmonic
+    const hum = ctx.createOscillator();
+    hum.type = 'sine';
+    hum.frequency.value = 100;
+    const humG = ctx.createGain();
+    humG.gain.value = 0.013;
+    const hum2 = ctx.createOscillator();
+    hum2.type = 'sine';
+    hum2.frequency.value = 200;
+    const hum2G = ctx.createGain();
+    hum2G.gain.value = 0.005;
+    hum.connect(humG).connect(out);
+    hum2.connect(hum2G).connect(out);
+    hum.start(t);
+    hum2.start(t);
+
+    this._pa = { out, hiss, hum, hum2, hg };
+    this._relay(0.085);
+  }
+
+  /** one word went through the system */
+  paPulse(strength = 1) {
+    if (!this._pa) return;
+    const t = this.ctx.currentTime;
+    const g = this._pa.hg.gain;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(0.042 + 0.05 * strength, t, 0.02);
+    g.setTargetAtTime(0.042, t + 0.10, 0.09);
+  }
+
+  /** key down, and let the room keep her for a moment */
+  paClose() {
+    if (!this._pa) return;
+    const { out, hiss, hum, hum2 } = this._pa;
+    const ctx = this.ctx, t = ctx.currentTime;
+    this._pa = null;
+
+    // the hall ringing on after the voice stops
+    const tail = ctx.createBufferSource();
+    tail.buffer = this.noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 900;
+    bp.Q.value = 0.8;
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.07, t);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    tail.connect(bp).connect(tg).connect(this.hall);
+    tail.start(t, Math.random() * 2);
+    tail.stop(t + 0.4);
+
+    setTimeout(() => this.ready && this._relay(0.055), 180);
+
+    out.gain.cancelScheduledValues(t);
+    out.gain.setTargetAtTime(0.0001, t + 0.16, 0.10);
+    try { hiss.stop(t + 1.4); hum.stop(t + 1.4); hum2.stop(t + 1.4); } catch (e) {}
+  }
+
   /**
    * Pull the room down and let it back up. Used when the announcer
    * speaks, since her voice cannot be routed through this graph.
@@ -722,17 +856,21 @@ export class Station {
    */
   _horn(when, dur, level = 1) {
     const ctx = this.ctx;
-    const root = rand(138, 176);
+    const root = rand(168, 208);
     const ratios = [1, 1.26, 1.5, 2.0, 3.0];
-    const weights = [1, 0.6, 0.7, 0.42, 0.14];
+    const weights = [1, 0.66, 0.78, 0.5, 0.2];
 
     const out = ctx.createGain();
-    const peak = 0.34 * level;
+    const peak = 0.62 * level;
     out.gain.setValueAtTime(0.0001, when);
     out.gain.exponentialRampToValueAtTime(peak, when + rand(0.22, 0.38));
     out.gain.setValueAtTime(peak, when + Math.max(0.4, dur * 0.72));
     out.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     out.connect(this._trainBus);
+
+    const dest = this._trainHornBus || this._trainBus;
+    out.disconnect();
+    out.connect(dest);
 
     ratios.forEach((r, i) => {
       const f = root * r * rand(0.997, 1.003);
@@ -746,7 +884,7 @@ export class Station {
 
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = f * 3.2;
+      lp.frequency.value = f * 6.0;   // keep the harmonics that make it a horn
 
       const g = ctx.createGain();
       g.gain.value = (0.5 * weights[i]) / ratios.length;
@@ -804,6 +942,17 @@ export class Station {
     const lvl = ctx.createGain();
     lvl.gain.value = 0.0001;
 
+    /* The horn gets its own path. Running it through the same air
+       filter as the exhaust muffles it into a hum, which is wrong
+       twice over: a horn is pitched low and loud precisely so it
+       carries further than anything else on the train. */
+    const hornBus = ctx.createGain();
+    const airH = ctx.createBiquadFilter();
+    airH.type = 'lowpass';
+    airH.Q.value = 0.4;
+    hornBus.connect(airH).connect(lvl);
+    this._trainHornBus = hornBus;
+
     bus.connect(air).connect(lvl);
     // straight to the master, past the ambience bus, so the ambience can
     // be ducked underneath it without ducking the train as well
@@ -831,8 +980,17 @@ export class Station {
       level[i] = Math.max(0.0001, top * near);
       cutoff[i] = 420 + (1 - far) * 900 + near * (1500 + (1 - far) * 2800);
     }
+    const cutoffH = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const d = Math.abs(t - 0.5) * 2;
+      const near = 1 / (1 + 4.2 * d * d);
+      cutoffH[i] = 1100 + (1 - far) * 1400 + near * (2800 + (1 - far) * 3200);
+    }
+
     lvl.gain.setValueCurveAtTime(level, t0, dur);
     air.frequency.setValueCurveAtTime(cutoff, t0, dur);
+    airH.frequency.setValueCurveAtTime(cutoffH, t0, dur);
 
     /* Duck the room under it. A real distant train doesn't get louder
        than the wind so much as it takes the wind's place for a minute. */
@@ -869,11 +1027,25 @@ export class Station {
        backwards from the closest approach so the big one lands as the
        engine goes past. A quieter blast on the way out.            */
     const at = t0 + peak;
-    this._horn(at - 12.0, 2.8, 0.72);
-    this._horn(at - 8.0, 2.5, 0.82);
-    this._horn(at - 4.6, 0.9, 0.86);
-    this._horn(at - 2.4, 5.0, 1.0);
-    if (Math.random() < 0.7) this._horn(at + rand(7, 11), rand(2.2, 3.4), 0.55);
+    // and the exhaust steps back under each blast, the way it does on
+    // any recording of one
+    const blast = (when, len, lvlv) => {
+      this._horn(when, len, lvlv);
+      bus.gain.setTargetAtTime(0.42, Math.max(t0, when - 0.15), 0.12);
+      bus.gain.setTargetAtTime(1.0, when + len * 0.8, 0.3);
+    };
+    /* Offsets are fractions of the pass, not absolute seconds, so a
+       short pass never schedules a blast in the past. */
+    for (const [frac, len, lv] of [
+      [-0.300, 2.8, 0.72],
+      [-0.200, 2.5, 0.82],
+      [-0.115, 0.9, 0.86],
+      [-0.060, 5.0, 1.00],
+    ]) {
+      blast(Math.max(t0 + 0.2, at + frac * dur), Math.min(len, dur * 0.3), lv);
+    }
+    // one more on the way out, already going away from you
+    if (Math.random() < 0.7) blast(at + dur * rand(0.18, 0.28), rand(2.2, 3.4), 0.55);
 
     /* ---- exhaust and bell, scheduled a little ahead at a time ----
        Four beats a revolution. The offsets are deliberately uneven:
@@ -900,10 +1072,11 @@ export class Station {
         clearInterval(this._train);
         this._train = null;
         this._trainBus = null;
+        this._trainHornBus = null;
         try {
           this.bus.gain.cancelScheduledValues(now);
           this.bus.gain.setTargetAtTime(1, now, 0.4);
-          bus.disconnect(); lvl.disconnect(); send.disconnect();
+          bus.disconnect(); hornBus.disconnect(); lvl.disconnect(); send.disconnect();
         } catch (e) {}
       }
     }, 450);

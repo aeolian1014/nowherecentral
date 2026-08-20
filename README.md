@@ -181,9 +181,32 @@ male. Names come off the board in caps, because that is how a split-flap
 works, so she gets them back in title case — speech engines read caps as
 initialisms. Times are spelt out too: "one thirty-nine", not "01:39".
 
-Web Speech output cannot be routed into an AudioContext, so she can't be
-given the station's reverb. The room ducks under her instead, which is
-what a real PA does anyway.
+#### Making her sound like a tannoy
+
+Her voice **cannot be filtered**. Web Speech writes to the output device,
+past the AudioContext entirely — there is no node to hang a bandpass on,
+and no honest way around it short of a server-side TTS.
+
+So the equipment gets built around her instead, and the ear does the
+rest. Three things carry it:
+
+- **Phrasing.** She speaks in separate utterances with real pauses
+  between them, not one sentence with commas. This does more for
+  "professional announcer" than any amount of processing.
+- **The rig.** A relay closes with a thump of cone movement, then a
+  carrier hiss band-limited the way a horn speaker is (420 Hz – 3.4 kHz)
+  runs underneath her with 100 Hz mains hum from an amplifier that has
+  been warm since 1974. At the end: key down, and the hall rings on for
+  a third of a second.
+- **Fusion.** Every word boundary pulses the carrier. The ear fuses a
+  voice with a noise bed that shares its band *and its timing* and hears
+  one source — so the hiss reads as carrying her rather than sitting
+  beside her. Without the pulsing it stays two separate sounds.
+
+Voice choice is scored, not first-match: a "Natural"/"Neural"/"Online"
+voice outranks the right name on an old SAPI one, since Edge ships
+several that are far better than anything local. `NC.voices()` lists
+what your machine has; `NC.voice('aria')` forces one.
 
 #### Writing a pack
 
