@@ -919,19 +919,18 @@ export class Station {
   }
 
   /**
-   * A steam train passes, a long way off. Roughly three quarters of a
-   * minute from first hearing it to losing it again.
+   * A steam train passes, a long way off.
    *
-   * @param {{peak?:number, far?:number}} opts
-   *   peak — seconds until closest approach (align this with whatever
-   *   you want it to coincide with). far — 0..1, how distant.
+   * @param {{dur?:number, far?:number}} opts
+   *   dur — the whole pass, first hearing it to losing it again.
+   *   far — 0..1, how distant.
    */
-  steamTrain({ peak = rand(20, 25), far = rand(0.74, 0.94) } = {}) {
+  steamTrain({ dur = rand(15, 20), far = rand(0.74, 0.94) } = {}) {
     if (!this.ready || !this.enabled) return;
     if (this._train) return;                       // one at a time
     const ctx = this.ctx;
     const t0 = ctx.currentTime + 0.05;
-    const dur = peak * 2;
+    const peak = dur * 0.5;
     const tEnd = t0 + dur;
 
     /* ---- the sub-graph everything runs through ---- */
@@ -1036,16 +1035,16 @@ export class Station {
     };
     /* Offsets are fractions of the pass, not absolute seconds, so a
        short pass never schedules a blast in the past. */
-    for (const [frac, len, lv] of [
-      [-0.300, 2.8, 0.72],
-      [-0.200, 2.5, 0.82],
-      [-0.115, 0.9, 0.86],
-      [-0.060, 5.0, 1.00],
+    for (const [frac, lenFrac, lv] of [
+      [-0.42, 0.130, 0.72],
+      [-0.28, 0.120, 0.82],
+      [-0.18, 0.050, 0.86],
+      [-0.10, 0.260, 1.00],
     ]) {
-      blast(Math.max(t0 + 0.2, at + frac * dur), Math.min(len, dur * 0.3), lv);
+      blast(Math.max(t0 + 0.2, at + frac * dur), dur * lenFrac, lv);
     }
     // one more on the way out, already going away from you
-    if (Math.random() < 0.7) blast(at + dur * rand(0.18, 0.28), rand(2.2, 3.4), 0.55);
+    if (Math.random() < 0.7) blast(at + dur * rand(0.18, 0.26), dur * 0.14, 0.55);
 
     /* ---- exhaust and bell, scheduled a little ahead at a time ----
        Four beats a revolution. The offsets are deliberately uneven:

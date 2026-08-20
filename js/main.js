@@ -721,7 +721,7 @@ function nightWiring() {
    sweep the light will make, so they arrive together.
    ================================================================ */
 const SWEEP_PERIOD = 1 / 0.0455;
-const QUIET_BETWEEN = [26000, 38000];    // silence between one pass and the next
+const QUIET_BETWEEN = [22000, 32000];    // silence between one pass and the next
 
 let trainDue = Infinity;
 /** The announcer sets the first one going once she has finished. */
@@ -736,17 +736,29 @@ function trainWatch() {
     if (announcer.speaking) return;        // never talk over her
     if (performance.now() < trainDue) return;
 
-    /* Aim the closest approach at a sweep peak, so the light crossing
-       the concourse floor and the engine going through are the same
-       event. The shader's cycle is fract(uTime * 0.0455). */
+    /* A pass is 15–20 seconds now, so its midpoint can no longer be
+       stretched to meet the light. Delay the *start* instead: work out
+       when the shader will next sweep the floor and set off early
+       enough that the engine arrives with it. */
+    const dur = rnd(15, 20);
     const now = gl.time;
-    const k = Math.ceil((now + 17 - SWEEP_PERIOD * 0.5) / SWEEP_PERIOD);
-    const peakIn = k * SWEEP_PERIOD + SWEEP_PERIOD * 0.5 - now;
+    const k = Math.ceil((now + dur * 0.5 - SWEEP_PERIOD * 0.5) / SWEEP_PERIOD);
+    const sweepAt = k * SWEEP_PERIOD + SWEEP_PERIOD * 0.5;
+    /* Only wait for the light if it is nearly here. The sweep comes
+       round every 22 seconds, and holding the train for the back half
+       of that would put a minute of silence between passes — a sync
+       nobody can consciously perceive is not worth the wait. */
+    const untilSweep = Math.max(0, sweepAt - dur * 0.5 - now);
+    const startIn = untilSweep <= 6 ? untilSweep : 0;
 
-    station.steamTrain({ peak: peakIn, far: 0.5 + Math.random() * 0.22 });
+    setTimeout(() => {
+      if (gl.current === 'concourse' && !inTransit && station.enabled) {
+        station.steamTrain({ dur, far: 0.5 + Math.random() * 0.22 });
+      }
+    }, startIn * 1000);
 
     // next one starts a short quiet after this one has gone
-    trainDue = performance.now() + peakIn * 2000 + rnd(...QUIET_BETWEEN);
+    trainDue = performance.now() + (startIn + dur) * 1000 + rnd(...QUIET_BETWEEN);
   }, 500);
 }
 
@@ -824,7 +836,7 @@ function init() {
     home: returnHome,
     sleep: toggleNight,
     /** NC.train() — hear one now, without waiting. NC.train(0.2) = close. */
-    train: (far = 0.6) => station.steamTrain({ peak: 18, far }),
+    train: (far = 0.6) => station.steamTrain({ dur: 18, far }),
     /**
      * NC.type(wght) — dial the display serif live on your own screen.
      * 400 is the elegant end, 600 the sturdy end. No arguments reads
