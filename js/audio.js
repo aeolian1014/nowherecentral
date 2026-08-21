@@ -274,6 +274,14 @@ export class Station {
     this.bus.connect(this.master);
     this.master.connect(this.limiter).connect(ctx.destination);
 
+    /* Interface sounds — keystrokes, and anything the fingers touch —
+       hang off the limiter directly rather than the ambient master, so
+       they are audible the instant the context exists, before (and
+       independent of) the station bed being switched on. */
+    this.ui = ctx.createGain();
+    this.ui.gain.value = 0.9;
+    this.ui.connect(this.limiter);
+
     // shared pink-ish noise
     const len = Math.floor(ctx.sampleRate * 3);
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -1102,6 +1110,64 @@ export class Station {
     g.connect(hg).connect(this.hall);
     src.start(t, Math.random() * 2, 0.06);
     src.stop(t + 0.07);
+  }
+
+  /**
+   * One keystroke on the terminal — the boot log typing itself out.
+   * A dry mechanical clack: a filtered noise transient for the contact,
+   * and one low tick under it for the key bottoming out. Cheaper and
+   * tighter than the flap click, and it varies a little each press so a
+   * line of text does not machine-gun.
+   *
+   * Routed through the UI path, so it plays during boot while the
+   * ambient bed is still off.
+   */
+  key(gain = 0.09) {
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = rand(1.4, 2.1);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = rand(2400, 4200);
+    bp.Q.value = 0.9;
+    const g = ctx.createGain();
+    const v = gain * rand(0.7, 1.15);
+    g.gain.setValueAtTime(v, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + rand(0.012, 0.022));
+    src.connect(bp).connect(g).connect(this.ui);
+    src.start(t, Math.random() * 2, 0.04);
+    src.stop(t + 0.05);
+
+    // the thock of the key bottoming out
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(rand(150, 210), t);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.03);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(v * 0.5, t);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+    o.connect(og).connect(this.ui);
+    o.start(t);
+    o.stop(t + 0.05);
+  }
+
+  /** carriage return: a slightly heavier press for the end of a line */
+  keyReturn() {
+    this.key(0.13);
+  }
+
+  /**
+   * Wake the audio engine from a user gesture without turning the
+   * ambient bed on. Lets the boot log make noise while the station is
+   * still nominally silent.
+   */
+  prime() {
+    if (!this.ready) this.init();
+    if (this.ready && this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ready;
   }
 
   /** departure: a rising sweep that ends in a thud */

@@ -189,6 +189,32 @@ body.no-gl {
   margin-bottom: var(--sp-7);
 }
 
+/* the threshold: audio cannot start until a gesture, so the terminal
+   waits behind one rather than typing itself out in silence */
+.boot-begin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 11.2em;
+  margin-bottom: var(--sp-7);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color var(--d-fast) var(--ease-std);
+}
+.boot-begin:hover { color: var(--accent); }
+.boot-begin.gone { display: none; }
+.boot-begin .caret {
+  width: 9px;
+  height: 1.05em;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: caretblink 1.05s steps(1) infinite;
+}
+@keyframes caretblink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
+
 .boot-log {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
@@ -200,6 +226,9 @@ body.no-gl {
   padding-left: var(--sp-4);
   border-left: 1px solid var(--border);
 }
+/* before the first keystroke the log holds no space; the begin prompt
+   stands in for it, so the panel does not reserve two blocks at once */
+.boot-log:empty { min-height: 0; margin: 0; padding: 0; border: 0; }
 .boot-log b { color: var(--accent); font-weight: 400; }
 .boot-log .dim { color: var(--text-dim); }
 

@@ -73,19 +73,46 @@ async function boot() {
     $('#boot-cta').classList.add('in');
     return;
   }
+
+  // characters land every 7ms, far faster than a clack can ring; throttle
+  // the keystroke sound to a realistic fast-typist cadence and skip spaces
+  let lastKey = 0;
+  const strike = (ch, force) => {
+    if (ch === ' ' && !force) return;
+    const now = performance.now();
+    if (!force && now - lastKey < 42) return;
+    lastKey = now;
+    station.key();
+  };
+
   for (const [tag, msg, hold] of BOOT_LINES) {
     const line = document.createElement('div');
     log.appendChild(line);
     const plain = msg.replace(/<[^>]+>/g, '');
     for (let i = 0; i <= plain.length; i++) {
       line.innerHTML = `<b>${tag}</b> ${plain.slice(0, i)}`;
+      if (i > 0) strike(plain[i - 1]);
       await wait(7);
     }
     line.innerHTML = `<b>${tag}</b> ${msg}`;
+    station.keyReturn();                    // the carriage return at line end
     await wait(hold * 0.35);
   }
   await wait(240);
   $('#boot-cta').classList.add('in');
+}
+
+/* The boot log types on load, before any click — but browsers block
+   audio until a gesture. So the log waits behind one: the first tap or
+   key press wakes the audio engine and then the terminal starts typing,
+   with sound. */
+let bootStarted = false;
+function beginBoot() {
+  if (bootStarted) return;
+  bootStarted = true;
+  station.prime();
+  $('#boot-begin').classList.add('gone');
+  boot();
 }
 
 function enterStation() {
@@ -1072,7 +1099,12 @@ function keys() {
       if (currentDest) returnHome();
       return;
     }
-    if (!entered && (e.key === 'Enter' || e.key === ' ')) { enterStation(); return; }
+    // Enter/Space only enters once the boot has finished — before that
+    // the same press is what begins the boot, and must not skip it
+    if (!entered && $('#boot-cta').classList.contains('in') && (e.key === 'Enter' || e.key === ' ')) {
+      enterStation();
+      return;
+    }
     if (typing) return;
     if (e.key === 'm' || e.key === 'M') { station.toggle(); if (!station.enabled) announcer.cancel(); updateSoundBtn(); return; }
     if (e.key === 'q' || e.key === 'Q') {
@@ -1165,7 +1197,25 @@ function init() {
     },
   };
 
-  boot();
+  if (REDUCED) {
+    boot();                                  // dumps instantly, no sound to gate
+  } else {
+    // the first tap or key press anywhere begins the boot, with sound
+    const begin = $('#boot-begin');
+    if (begin) {
+      begin.addEventListener('click', beginBoot);
+      begin.focus({ preventScroll: true });
+    }
+    const onFirst = () => { beginBoot(); teardown(); };
+    const teardown = () => {
+      removeEventListener('pointerdown', onFirst, true);
+      removeEventListener('keydown', onFirst, true);
+      removeEventListener('touchstart', onFirst, true);
+    };
+    addEventListener('pointerdown', onFirst, true);
+    addEventListener('keydown', onFirst, true);
+    addEventListener('touchstart', onFirst, true);
+  }
 }
 
 init();
