@@ -195,6 +195,190 @@ export const LOST_AND_FOUND = [
     'A return ticket. Undated. Unused. Unrefundable.',
     'Kept in case. It has never once been needed. It is very heavy for a piece of card.',
   ],
+  [
+    'SHO-2244',
+    'One (1) pair of shoes. Still wet.',
+    'They walked somebody home and came back on their own. The road is still out there. It does not need you on it tonight.',
+  ],
+  [
+    'CTY-0700',
+    'A view from a window that was never yours.',
+    'Counted every lit floor of it for a year. Every one of those lights is somebody else also still up. You were never the only one.',
+  ],
+  [
+    'TPE-1988',
+    'A tape, unlabelled. Recorded over something.',
+    'Whatever was on it first is gone and is not recoverable. It still plays. Most things you have taped over are fine.',
+  ],
+];
+
+/* ------------------------------------------------------------------
+   ARRIVALS
+
+   The departures board sends you to places that were invented. This
+   one lists services inbound from places you actually had, and not
+   one of them is going to land. Every value in the status column is a
+   way of saying no, and the platform column is a dash on every line,
+   because nothing is being held for any of them.
+
+   Names are capped at COLS.dest (16) and statuses at COLS.status (9),
+   and the split-flap CHARSET has no apostrophe — anything outside it
+   is dropped silently by FlapLine._fit, so it is written out here.
+------------------------------------------------------------------ */
+export const ARRIVALS = [
+  {
+    id: 'midnight',
+    code: 'MDR',
+    name: 'MIDNIGHT DRIVE',
+    platform: '1',
+    offset: 3,   // minutes from load, like the world board
+
+    status: 'DELAYED',
+    note: 'Delayed. Nobody has driven it since. The road is still lit the whole way out.',
+    line: 'The service from the midnight drive is delayed. No revised time is available.',
+    media: {
+      type: 'image',
+      src: 'assets/media/midnight-drive.webp',
+      audio: 'assets/media/midnight-drive.opus',
+      cues: true,        // the night programme runs here and nowhere else
+    },
+  },
+  {
+    id: 'horizon',
+    code: 'EVH',
+    name: 'EVENT HORIZON',
+    platform: '4',
+    offset: 9,   // minutes from load, like the world board
+
+    status: 'CANCELLED',
+    note: 'Cancelled. Everything that ever went that way is still going. None of it has arrived.',
+    line: 'The service to the event horizon has been cancelled. It will not be rescheduled.',
+    media: {
+      type: 'video',
+      src: 'assets/media/event-horizon.mp4',
+      audio: 'assets/media/event-horizon.opus',
+    },
+  },
+  {
+    id: 'tuesday',
+    code: 'TMR',
+    name: 'TUESDAY IN MARCH',
+    platform: '5',
+    offset: 16,   // minutes from load, like the world board
+
+    status: 'HELD',
+    note: 'Held outside the station. An ordinary day you would give a great deal to stand in again.',
+    line: 'The service from that Tuesday in March is being held outside the station.',
+    media: {
+      type: 'video',
+      src: 'assets/media/gradient-girl.mp4',
+      audio: 'assets/media/tuesday-in-march.opus',
+    },
+  },
+  {
+    id: 'goodyear',
+    code: 'LGY',
+    name: 'LAST GOOD YEAR',
+    platform: '6',
+    offset: 24,   // minutes from load, like the world board
+
+    status: 'NO REPORT',
+    note: 'No report. You did not know it was the last one. Nobody is ever told at the time.',
+    line: 'There is no report on the service from the last good year.',
+    media: { type: 'image', src: 'assets/media/heavenly-sky.webp' },
+  },
+  {
+    id: 'whoever',
+    code: 'WYW',
+    name: 'WHOEVER YOU WERE',
+    platform: '8',
+    offset: 33,   // minutes from load, like the world board
+
+    status: 'LATE',
+    note: 'Running late. Running very late. You would not recognise them at the barrier now anyway.',
+    line: 'The service carrying whoever you were then is running late.',
+    media: {
+      type: 'image',
+      src: 'assets/media/egirl.webp',
+      fx: 'tape',
+      audio: 'assets/media/whoever-you-were.opus',
+    },
+  },
+  {
+    id: 'spring',
+    code: 'ASP',
+    name: 'ANOTHER SPRING',
+    platform: '9',
+    offset: 47,   // minutes from load, like the world board
+
+    status: 'NOT KNOWN',
+    note: 'Not known. It belonged to somebody else and you only ever watched it from the platform.',
+    line: 'The status of the service from another spring is not known.',
+    media: { type: 'image', src: 'assets/media/haunted-hood.webp' },
+  },
+  {
+    id: 'summer',
+    code: 'EVS',
+    name: 'EVERY SUMMER',
+    platform: '10',
+    offset: 62,   // minutes from load, like the world board
+
+    status: 'AWAITED',
+    note: 'Awaited. All of them at once, arriving on one train, which is not a thing trains can do.',
+    line: 'Every summer is still awaited. They are expected to arrive together.',
+    media: {
+      type: 'video',
+      src: 'assets/media/ancient-love.mp4',
+      audio: 'assets/media/every-summer.opus',
+    },
+  },
+];
+
+/* ------------------------------------------------------------------
+   NIGHT PROGRAMME — what the station says over the bed
+
+   Each entry is a file in assets/voice/ — ogg, opus, wav, mp3, m4a or
+   flac, the name does not matter. Filenames below are only examples;
+   point them at whatever is actually in the folder.
+
+   Playback is band-limited to 380–3200 Hz with a short tail before it
+   reaches the speakers, and the bed ducks underneath. That filtering
+   is what makes a line sit inside the music rather than on top of it:
+   the chest and the air are what give a close-mic'd voice away as a
+   separate source. Nothing routes through the tannoy rig, so there is
+   no relay click and no carrier hiss.
+
+   OPENER runs first, its `after` being the silence held once the clip
+   has finished. Then LINES play one a minute. After the last one the
+   opener comes back round, so the sequence never quite resolves.
+
+   A plain string instead of { src } falls back to speech synthesis.
+------------------------------------------------------------------ */
+/* Played first, in this order. There is no burst any more — every cue
+   in both lists is a minute apart, including these. */
+export const NIGHT_OPENER = [
+  { src: 'assets/voice/one.mp3' },
+  { src: 'assets/voice/two.ogg' },
+  { src: 'assets/voice/three.mp3' },
+  { src: 'assets/voice/four.mp3' },
+];
+
+/* The rest of the rotation. After the last one there is one more
+   minute and the list starts again from the top of NIGHT_OPENER. */
+export const NIGHT_LINES = [
+  { src: 'assets/voice/five.ogg' },
+  { src: 'assets/voice/six.ogg' },
+  { src: 'assets/voice/seven.ogg' },
+  { src: 'assets/voice/eight.ogg' },
+];
+
+/* What the announcer says when somebody keeps pressing an arrival
+   that is never going to come in. */
+export const ARRIVAL_REFUSALS = [
+  'That service is not expected.',
+  'There is nothing further on that one.',
+  'It is not coming in tonight. You can stop watching the board.',
+  'The board has told you everything it knows.',
 ];
 
 /* Rotated on the deposit slip, so the counter never asks twice the

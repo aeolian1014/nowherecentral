@@ -7,9 +7,7 @@
 <meta name="description" content="The terminus for services that do not arrive. Six destinations, none of which exist. Live board.">
 <meta name="theme-color" content="#05070a">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%2305070a'/><text y='23' x='16' text-anchor='middle' font-family='monospace' font-size='18' font-weight='700' fill='%23ffb347'>N</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..700&family=JetBrains+Mono:wght@300;400;700&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/main.css">
 </head>
@@ -31,6 +29,9 @@
       <span class="dot"></span>
       <span>Enter the concourse</span>
     </button>
+    <p class="boot-foot boot-note">
+      For the full visual experience, use a desktop device.
+    </p>
     <p class="boot-foot">
       Sound is part of it. Headphones recommended.<br>
       <b>M</b> sound &nbsp;·&nbsp; <b>Q</b> rendering quality &nbsp;·&nbsp; <b>N</b> night service
@@ -103,8 +104,16 @@
     </div>
 
     <div class="board-shell" id="board-shell">
+      <div class="board-tabs" role="tablist" aria-label="Board">
+        <button class="board-tab on" id="tab-dep" type="button" role="tab"
+                aria-selected="true" aria-controls="panel-dep">Departures</button>
+        <button class="board-tab" id="tab-arr" type="button" role="tab"
+                aria-selected="false" aria-controls="panel-arr" tabindex="-1">Arrivals</button>
+        <span class="board-tabs-ink" id="tabs-ink" aria-hidden="true"></span>
+      </div>
+
       <div class="board-scroll">
-        <div class="board-grid">
+        <div class="board-grid" id="panel-dep" role="tabpanel" aria-labelledby="tab-dep">
           <div class="board-colhead" aria-hidden="true">
             <span class="w-idx"><i class="lg">No.</i><i class="sm">№</i></span>
             <span class="w-time"><i class="lg">Departs</i><i class="sm">Dep</i></span>
@@ -112,12 +121,26 @@
             <span class="w-plat"><i class="lg">Plat</i><i class="sm">Pl</i></span>
             <span class="w-status"><i class="lg">Status</i><i class="sm">Sts</i></span>
           </div>
+          <div id="arr-rows"></div>
+        </div>
+
+        <div class="board-grid" id="panel-arr" role="tabpanel" aria-labelledby="tab-arr" hidden>
+          <div class="board-colhead" aria-hidden="true">
+            <span class="w-idx"><i class="lg">No.</i><i class="sm">№</i></span>
+            <span class="w-time"><i class="lg">Due</i><i class="sm">Due</i></span>
+            <span class="w-dest"><i class="lg">Origin</i><i class="sm">From</i></span>
+            <span class="w-plat"><i class="lg">Plat</i><i class="sm">Pl</i></span>
+            <span class="w-status"><i class="lg">Status</i><i class="sm">Sts</i></span>
+          </div>
           <div id="board-rows"></div>
         </div>
       </div>
+
       <div class="board-foot">
         <span id="notice-line">Please mind the gap. The gap does not mind you.</span>
-        <span>Board refreshed continuously</span>
+        <!-- matches the default board (media). showBoard only runs on a
+             switch, so the initial note has to be correct in the markup. -->
+        <span id="board-foot-note">No service on this board is expected.</span>
       </div>
     </div>
   </section>
@@ -241,6 +264,39 @@
     </div>
 
     <p class="q-hint" id="q-hint">Stop moving and this all goes away.</p>
+  </div>
+</section>
+
+<!-- ============================ THE REEL ========================== -->
+<section id="reel" class="reel" aria-hidden="true" inert aria-label="Arrival">
+  <div class="reel-bg" aria-hidden="true">
+    <div class="reel-stage" id="reel-stage">
+      <div class="reel-media" id="reel-media"></div>
+      <div class="reel-vig"></div>
+      <div class="reel-scan"></div>
+    </div>
+  </div>
+
+  <div class="reel-inner">
+    <div class="arr-top">
+      <button class="arr-back" id="reel-back" type="button" aria-label="Return to Nowhere Central">
+        <span>←</span><span>Return to Nowhere Central</span>
+      </button>
+      <span id="reel-ref">— · Platform —</span>
+    </div>
+
+    <div class="reel-body">
+      <p class="arr-code" id="reel-code"></p>
+      <h2 id="reel-title"></h2>
+      <p id="reel-note"></p>
+      <p class="reel-line" id="reel-line"></p>
+    </div>
+
+    <div class="arr-foot">
+      <span>Other services</span>
+      <div class="arr-nav" id="reel-nav"></div>
+      <span>Esc · return</span>
+    </div>
   </div>
 </section>
 

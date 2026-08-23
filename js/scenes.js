@@ -301,6 +301,278 @@ vec3 world(vec2 uv, vec2 st){
 }
 `;
 
+/* =================================================================
+   THE WALK BACK  —  the wet shoes
+
+   This one is a real 3D scene, not stacked layers. A camera at the
+   origin, a road plane, six sodium lamps going away down it, and fog
+   between you and all of them.
+
+   The light in the air is the whole picture, and it is computed, not
+   drawn: the in-scattering integral for a point light along a ray has
+   a closed form, so each shaft is exact and perfectly smooth instead
+   of marched and banded — one atan pair per lamp, no sample loop. The
+   road is the same integral again, fired along the reflected ray, off
+   a normal bent by rain. That is why the reflections streak vertically
+   without anyone telling them to.
+   ================================================================= */
+const RAINWALK = `
+/* In-scattering along a ray, in closed form.
+   ∫₀ᵀ dt/(h² + (t−b)²) = (1/h)·[atan((T−b)/h) + atan(b/h)]
+   Marching this costs N samples per lamp and still bands. This does
+   not band, because it is not sampled. */
+float shaft(vec3 ro, vec3 rd, vec3 L, float tMax){
+  vec3  v  = L - ro;
+  float b  = dot(v, rd);
+  float h2 = max(dot(v, v) - b * b, 2e-3);
+  float h  = sqrt(h2);
+  return (atan((tMax - b) / h) + atan(b / h)) / h;
+}
+
+/* The lamps recede down the road. Nothing converges them by hand —
+   perspective does that, because they are actually out there. */
+vec3 lampAt(float i){ return vec3(0.62, 0.60, 4.0 + i * 5.4); }
+
+/* Wet tarmac — fine ripples, not swell. The amplitude here is the
+   difference between a road in the rain and an ocean at night. */
+float wetH(vec2 p){
+  float h = fbm(p * 5.5 + vec2(0.0, uTime * 0.5), 2) * 0.5
+          + fbm(p * 13.0 - vec2(uTime * 0.35, 0.0), 2) * 0.22;
+  for(int i = 0; i < 3; i++){
+    float fi   = float(i);
+    float seed = hash11(fi * 17.3);
+    float per  = 2.6 + seed * 3.4;
+    float ph   = uTime / per + seed * 23.0;
+    float t    = fract(ph) * per;
+    vec2  c    = (hash22(vec2(fi * 2.7, floor(ph))) - 0.5) * vec2(3.0, 16.0) + vec2(0.0, 9.0);
+    float d    = length(p - c);
+    h += sin(d * 30.0 - t * 34.0) * exp(-d * 5.5) * exp(-t * 1.4) * 0.10;
+  }
+  return h;
+}
+
+vec3 world(vec2 uv, vec2 st){
+  vec3 ro = vec3(0.0, 0.0, 0.0);
+  vec3 rd = normalize(vec3(uv.x + uMouse.x * 0.020,
+                           uv.y - 0.055 + uMouse.y * 0.014, 1.15));
+
+  const float GY   = -0.55;
+  const vec3  LAMP = vec3(0.38, 0.60, 1.00);
+
+  float tG   = (rd.y < -1e-4) ? (GY - ro.y) / rd.y : 1e9;
+  float tMax = min(tG, 95.0);
+
+  /* ---- what the air gives back. this coefficient is the exposure of
+     the whole picture; too much and the night turns to milk. ---- */
+  vec3 air = vec3(0.0);
+  for(int i = 0; i < 7; i++){
+    float fi = float(i);
+    vec3  L  = lampAt(fi);
+    air += LAMP * shaft(ro, rd, L, tMax) * 0.0115;
+
+    // the bulb, sized by angle, so distance shrinks it correctly
+    vec3  v = L - ro;
+    float b = dot(v, rd);
+    if(b > 0.0){
+      float ang = length(v - rd * b) / b;
+      float att = 1.0 / (1.0 + b * b * 0.010);
+      air += LAMP * smoothstep(0.020, 0.002, ang) * 1.20 * att;
+      air += LAMP * smoothstep(0.130, 0.000, ang) * 0.085 * att;
+
+      // the post, hanging under it
+      vec3 P = vec3(L.x, GY, L.z);
+      float pb = dot(P - ro, rd);
+      if(pb > 0.0){
+        vec3  pp   = ro + rd * pb;
+        float sideD = abs(pp.x - L.x) / pb;
+        float below = step(pp.y, L.y - 0.03) * step(GY - 0.02, pp.y);
+        air += vec3(0.030, 0.042, 0.070) * smoothstep(0.006, 0.0, sideD) * below * att * 2.0;
+      }
+    }
+  }
+
+  /* ---- the road, handing all of it back ---- */
+  vec3 surf = vec3(0.0);
+  if(tG > 0.0 && tG < 95.0){
+    vec3 pos = ro + rd * tG;
+    vec2 gp  = pos.xz;
+
+    /* Tarmac in the middle. A road does not have a ruled edge, so the
+       kerb wanders with the same noise the verge is made of. */
+    float edge = 1.22 + (vnoise(vec2(pos.z * 0.55, sign(pos.x) * 3.7)) - 0.5) * 0.34;
+    float road = smoothstep(edge + 0.30, edge - 0.18, abs(pos.x));
+
+    float e  = 0.05;
+    float h0 = wetH(gp);
+    vec3  n  = normalize(vec3((h0 - wetH(gp + vec2(e, 0.0))) * 0.016,
+                              e,
+                              (h0 - wetH(gp + vec2(0.0, e))) * 0.016));
+
+    vec3 rr   = reflect(rd, n);
+    vec3 refl = vec3(0.0);
+    for(int i = 0; i < 7; i++){
+      refl += LAMP * shaft(pos, rr, lampAt(float(i)), 95.0) * 0.030;
+    }
+
+    float fres = pow(1.0 - sat(dot(-rd, n)), 5.0);
+    surf = vec3(0.0035, 0.0050, 0.0090) * (0.35 + road * 0.65)
+         + refl * road * (0.22 + fres * 1.45);
+  }
+
+  vec3 col = surf * exp(-tG * 0.055) + air;
+
+  /* ---- what grows along the verge.
+     Two vertical planes at x = ±1.75. Where the ray crosses one below
+     its ragged top, everything behind it is gone. This is what gives
+     the road something to be a road between. ---- */
+  float hedge = 0.0;
+  for(int s = 0; s < 2; s++){
+    float sx = mix(-1.75, 1.75, float(s));
+    float th = (abs(rd.x) > 1e-4) ? sx / rd.x : -1.0;
+    if(th > 0.6 && th < 55.0){
+      vec3  hp  = ro + rd * th;
+      float top = GY + 0.62 + (fbm(vec2(hp.z * 0.7, float(s) * 9.0), 3) - 0.5) * 0.62;
+      if(hp.y < top) hedge = max(hedge, exp(-th * 0.055));
+    }
+  }
+  col = mix(col, vec3(0.0035, 0.0050, 0.0085), hedge * 0.93);
+
+  /* ---- rain, brightened by whatever it is falling through ---- */
+  vec2 sp = uv;
+  sp.x += sp.y * 0.15;
+  float rn = 0.0;
+  for(int k = 0; k < 3; k++){
+    float fk = float(k);
+    float sc = 24.0 + fk * 19.0;
+    float id = floor(sp.x * sc);
+    float hh = hash11(id * 1.37 + fk * 51.0);
+    float y  = fract(sp.y * sc * 0.30 - uTime * (0.55 + fk * 0.33) * (0.6 + hh * 0.7) + hh * 9.1);
+    float x  = fract(sp.x * sc) - 0.5;
+    float s  = smoothstep(0.5, 0.0, abs(x) * (30.0 + fk * 16.0));
+    s *= smoothstep(0.0, 0.09, y) * smoothstep(0.38, 0.10, y);
+    rn += s * step(0.44, hh) * (0.16 - fk * 0.04);
+  }
+  col += LAMP * rn * (0.25 + sat(length(air)) * 2.2);
+
+  return col;
+}
+`;
+
+/* =================================================================
+   SOMEBODY ELSE'S CITY  —  the borrowed view
+   Three ranks of towers at three depths, lit at random and never
+   changing their minds about it. Droplets on the glass in front,
+   holding still, because the window is shut and you are inside.
+   ================================================================= */
+const CITYGLOW = `
+/* one rank of towers. returns the silhouette; writes the lit windows. */
+float towers(vec2 p, float scale, float baseH, float amp, float seed, out float lit){
+  float tx  = p.x * scale + seed;
+  float id  = floor(tx);
+  float h   = baseH + hash11(id * 3.71 + seed) * amp;
+  float m   = step(p.y, h);
+  vec2  w   = vec2(fract(tx) * 4.0, (h - p.y) * 26.0);
+  vec2  wid = floor(w);
+  float on  = step(0.70, hash21(wid + vec2(id * 13.0, seed)));
+  vec2  wf  = fract(w) - 0.5;
+  float box = smoothstep(0.30, 0.16, max(abs(wf.x) * 1.6, abs(wf.y) * 1.1));
+  lit = box * on * m * step(0.0, w.y);
+  return m;
+}
+
+vec3 world(vec2 uv, vec2 st){
+  vec2 p = uv + uMouse * 0.018;
+
+  vec3 col = mix(vec3(0.075, 0.038, 0.135), vec3(0.010, 0.008, 0.028), sat(p.y * 1.5 + 0.42));
+  col += vec3(0.26, 0.09, 0.34) * exp(-sat(p.y + 0.46) * 3.6) * 0.42;
+
+  float lit;
+  float m;
+  m = towers(p, 3.4, -0.06, 0.30, 11.0, lit);            // far
+  col = mix(col, vec3(0.028, 0.020, 0.055), m);
+  col += vec3(1.00, 0.74, 0.42) * lit * 0.30;
+
+  m = towers(p, 2.2, -0.14, 0.34, 3.0, lit);             // middle
+  col = mix(col, vec3(0.016, 0.012, 0.034), m);
+  col += vec3(1.00, 0.80, 0.50) * lit * 0.42;
+
+  m = towers(p, 1.4, -0.24, 0.28, 27.0, lit);            // near
+  col = mix(col, vec3(0.008, 0.006, 0.020), m);
+  col += vec3(1.00, 0.86, 0.58) * lit * 0.50;
+
+  // things out of focus, drifting on cycles that never line up
+  for(int i = 0; i < 6; i++){
+    float fi = float(i);
+    vec2 c = (hash22(vec2(fi * 5.3, 1.0)) - 0.5) * vec2(2.0, 1.0);
+    c.y += sin(uTime / (19.0 + fi * 4.3) + fi) * 0.02;
+    float rr = 0.045 + hash11(fi * 7.1) * 0.05;
+    col += vec3(0.42, 0.30, 0.62) * smoothstep(rr, rr * 0.55, length(p - c)) * 0.10;
+  }
+
+  // the glass itself. these do not move; the window is shut.
+  vec2 dp  = p * 9.0;
+  vec2 did = floor(dp);
+  vec2 dc  = hash22(did) - 0.5;
+  float dd = length(fract(dp) - 0.5 - dc * 0.6);
+  col += vec3(0.30, 0.24, 0.46)
+       * smoothstep(0.22, 0.10, dd) * step(0.80, hash21(did * 1.7)) * 0.28;
+
+  return col;
+}
+`;
+
+/* =================================================================
+   THE NIGHT PROGRAMME  —  the unlabelled tape
+   Whatever was recorded first is gone. What is left is the machine's
+   own handwriting: chroma that lands beside the picture instead of on
+   it, a tracking band climbing the frame once every thirty-seven
+   seconds, and head-switching noise along the bottom edge where the
+   drum leaves the tape. Nothing here cuts, because nothing here is
+   edited. It is a tape.
+   ================================================================= */
+const TAPE = `
+vec3 tapePic(vec2 p){
+  float t = uTime * 0.016;
+  float n = fbm(p * 1.45 + vec2(t, t * 0.55), 4);
+  float m = fbm(p * 0.70 - vec2(t * 0.7, t * 0.3) + n * 0.5, 3);
+  vec3 c = mix(vec3(0.022, 0.016, 0.048), vec3(0.110, 0.055, 0.150), sat(n * 0.8 + m * 0.35));
+  c += vec3(0.10, 0.14, 0.22) * pow(sat(1.0 - abs(p.y + 0.06) * 2.2), 4.0) * 0.55;
+  c += vec3(0.16, 0.06, 0.12) * pow(sat(m), 3.0) * 0.40;
+  return c;
+}
+
+vec3 world(vec2 uv, vec2 st){
+  vec2 p = uv;
+
+  // one pass up the frame every 37s. slow enough you never catch it start.
+  float band = fract(st.y - uTime / 37.0);
+  float inB  = smoothstep(0.0, 0.015, band) * smoothstep(0.055, 0.038, band);
+
+  // 240 lines, not device pixels — the ladder can drop uRes and this must not alias
+  float line   = floor(st.y * 240.0);
+  float jitter = hash21(vec2(line, floor(uTime * 6.0))) - 0.5;
+  p.x += jitter * (0.0009 + inB * 0.055);
+
+  // the colour carrier never lands where the luma does
+  float ab = 0.0022 + inB * 0.012;
+  vec3 col;
+  col.r = tapePic(p + vec2(ab, 0.0)).r;
+  col.g = tapePic(p).g;
+  col.b = tapePic(p - vec2(ab * 0.8, 0.0)).b;
+
+  col *= 0.88 + 0.12 * sin(st.y * 240.0 * PI);              // scanlines
+  col += vec3(0.10, 0.09, 0.13) * inB * 0.50;               // the band lifts the level
+  col += vec3(0.5) * hash21(gl_FragCoord.xy + uTime * 31.0) * inB * 0.06;
+
+  // where the drum leaves the tape
+  float hs = smoothstep(0.045, 0.0, st.y);
+  col = mix(col, vec3(hash21(gl_FragCoord.xy * 0.7 + uTime * 57.0)) * 0.22, hs * 0.55);
+
+  col *= 0.93 + 0.07 * sin(uTime / 11.3);                   // the whole thing breathes
+  return col;
+}
+`;
+
 export const SCENES = {
   ripples: PRE + RIPPLES + TAIL,
   ember: PRE + EMBER + TAIL,
@@ -310,6 +582,9 @@ export const SCENES = {
   breath: PRE + BREATH + TAIL,
   grain: PRE + GRAIN + TAIL,
   window: PRE + WINDOW + TAIL,
+  rainwalk: PRE + RAINWALK + TAIL,
+  cityglow: PRE + CITYGLOW + TAIL,
+  tape: PRE + TAPE + TAIL,
 };
 
 /** What each thing on the counter turns out to be, when you pick it up. */
@@ -322,4 +597,7 @@ export const SCENE_OF = {
   'NAM-0001': { id: 'breath', title: 'Four in, seven held, eight out', caption: 'Follow the ring if you like. Or do not, and just watch it.' },
   'PHT-5510': { id: 'grain', title: 'Everyone, looking left', caption: 'It almost settles into a picture. Let it not.' },
   'TKT-∞':    { id: 'window', title: 'The window seat', caption: 'Somebody out there is also still awake. The journey has no stops.' },
+  'SHO-2244': { id: 'rainwalk', title: 'The walk back', caption: 'The lamps go on ahead of you. You do not have to follow them tonight.' },
+  'CTY-0700': { id: 'cityglow', title: 'Somebody else’s city', caption: 'Every lit window is a person not asleep either. You are not the only one.' },
+  'TPE-1988': { id: 'tape', title: 'The night programme', caption: 'Whatever was on it first is gone. It plays anyway, and that is enough.' },
 };

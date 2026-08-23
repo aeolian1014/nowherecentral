@@ -6,7 +6,31 @@
 ------------------------------------------------------------------ */
 
 export const CHARSET = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:.-—/∞°';
-const IDX = new Map([...CHARSET].map((c, i) => [c, i]));
+
+/* A real board does not carry one drum. The clock columns are digits
+   and a colon; the destination columns are letters. Giving every cell
+   the full 44-glyph set meant a time cell span the alphabet on its way
+   to a number — wrong to look at, and up to 18 flaps of work per cell
+   where six would do. Each role now gets only the glyphs it can
+   actually display, which shortens every spin and drops the number of
+   cells the shared ticker has to keep live.
+
+   Any character outside a role's own drum is dropped by _fit, so these
+   sets have to cover every value the column is ever given. */
+const ALPHABETS = {
+  time:   ' 0123456789:-',
+  dest:   ' ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  plat:   ' 0123456789—',
+  status: ' ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  full:   CHARSET,
+};
+
+const DRUMS = Object.fromEntries(
+  Object.entries(ALPHABETS).map(([k, chars]) => [
+    k,
+    { chars, idx: new Map([...chars].map((c, i) => [c, i])) },
+  ])
+);
 
 const STEP_MS = 52;      // one flap
 const MAX_STEPS = 18;    // never spin further than this to reach a target
@@ -50,8 +74,10 @@ function wake() {
 
 /* --- one character ------------------------------------------------ */
 class Cell {
-  constructor(host, onFlip) {
+  constructor(host, onFlip, drum = DRUMS.full) {
     this.onFlip = onFlip;
+    this.chars = drum.chars;
+    this.idx = drum.idx;
     const el = document.createElement('div');
     el.className = 'cell';
     el.setAttribute('aria-hidden', 'true');
@@ -77,24 +103,25 @@ class Cell {
   }
 
   to(ch, delay = 0) {
-    const target = IDX.has(ch) ? ch : ' ';
+    const chars = this.chars, idx = this.idx, N = chars.length;
+    const target = idx.has(ch) ? ch : ' ';
     if (target === this.cur && !this.queue.length) return;
 
-    let from = IDX.get(this.cur);
-    const to = IDX.get(target);
-    let dist = (to - from + CHARSET.length) % CHARSET.length;
-    if (dist === 0) dist = CHARSET.length;
+    let from = idx.get(this.cur);
+    const to = idx.get(target);
+    let dist = (to - from + N) % N;
+    if (dist === 0) dist = N;
     if (dist > MAX_STEPS) {
       // jump the drum forward so the flip stays a believable length
-      from = (to - MAX_STEPS + CHARSET.length * 2) % CHARSET.length;
-      this.cur = CHARSET[from];
+      from = (to - MAX_STEPS + N * 2) % N;
+      this.cur = chars[from];
       this.topS.textContent = this.cur;
       this.botS.textContent = this.cur;
       dist = MAX_STEPS;
     }
 
     this.queue = [];
-    for (let i = 1; i <= dist; i++) this.queue.push(CHARSET[(from + i) % CHARSET.length]);
+    for (let i = 1; i <= dist; i++) this.queue.push(chars[(from + i) % N]);
     this.delay = delay;
     this.p = 0;
     this.beginStep();
@@ -150,13 +177,14 @@ export class FlapLine {
     this.length = length;
     this.align = align;
     this.value = '';
-    this.cells = Array.from({ length }, () => new Cell(this.el, onFlip));
+    this.drum = DRUMS[role] || DRUMS.full;
+    this.cells = Array.from({ length }, () => new Cell(this.el, onFlip, this.drum));
     host.appendChild(this.el);
   }
 
   _fit(text) {
     let s = String(text ?? '').toUpperCase();
-    s = [...s].filter((c) => IDX.has(c) || c === ' ').join('');
+    s = [...s].filter((c) => this.drum.idx.has(c) || c === ' ').join('');
     if (s.length > this.length) s = s.slice(0, this.length);
     const pad = this.length - s.length;
     if (this.align === 'right') return ' '.repeat(pad) + s;

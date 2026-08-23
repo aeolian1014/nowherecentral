@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>scene probe</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}canvas{display:block;width:100vw;height:100vh}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { SCENES } from '../js/scenes.js';
+import { WORLDS } from '../js/shaders.js';
+const ALL = { ...SCENES, ...WORLDS };
+const which = new URLSearchParams(location.search).get('s') || 'rainwalk';
+const t0off = parseFloat(new URLSearchParams(location.search).get('t') || '0');
+
+const c = document.getElementById('c');
+const gl = c.getContext('webgl2');
+const dpr = Math.min(devicePixelRatio, 2);
+c.width = innerWidth * dpr; c.height = innerHeight * dpr;
+
+const VERT = `#version 300 es
+in vec2 aPos; void main(){ gl_Position = vec4(aPos,0.0,1.0); }`;
+function sh(t, s){ const o = gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o);
+  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; }
+const p = gl.createProgram();
+gl.attachShader(p, sh(gl.VERTEX_SHADER, VERT));
+gl.attachShader(p, sh(gl.FRAGMENT_SHADER, ALL[which]));
+gl.linkProgram(p); gl.useProgram(p);
+
+const vb = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,3,-1,-1,3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(p,'aPos');
+gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+const U = n => gl.getUniformLocation(p,n);
+const t0 = performance.now();
+(function frame(){
+  const t = t0off + (performance.now()-t0)/1000;
+  gl.viewport(0,0,c.width,c.height);
+  gl.uniform2f(U('uRes'), c.width, c.height);
+  gl.uniform1f(U('uTime'), t);
+  gl.uniform2f(U('uMouse'), 0, 0);
+  gl.uniform1f(U('uScroll'), 0);
+  gl.uniform1f(U('uGrain'), 1);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  requestAnimationFrame(frame);
+})();
+window.__ready = true;
+</script>
+</body>
+</html>

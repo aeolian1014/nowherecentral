@@ -25,8 +25,12 @@ const WORLD_SCALE = {
    opinion counts — Q cycles these and the choice is remembered. */
 export const QUALITY = [
   { name: 'AUTO', scale: null, budget: null, grain: 1, fps: 0, auto: true },
-  { name: 'HIGH', scale: 0.9, budget: 1800000, grain: 1, fps: 0 },
-  { name: 'MEDIUM', scale: 0.62, budget: 820000, grain: 1, fps: 0 },
+  /* HIGH must mean native. At scale 0.9 the canvas was always rendered
+     below the display and upscaled, so HIGH was permanently soft — and
+     the old 1.8M budget clamped it under native on any 1080p window
+     (which needs ~2.07M), so raising the scale alone would not have
+     helped. 2.6M leaves headroom for a fractional devicePixelRatio. */
+  { name: 'HIGH', scale: 1.0, budget: 2600000, grain: 1, fps: 0 },
   { name: 'LOW', scale: 0.45, budget: 460000, grain: 0, fps: 30 },
 ];
 
@@ -252,6 +256,12 @@ export class Renderer {
   restoreQuality() {
     let i = 0;
     try { i = parseInt(localStorage.getItem('nc-quality') || '0', 10) || 0; } catch (e) {}
+    /* Clamp rather than let setQuality's modulo wrap. MEDIUM used to sit
+       at index 2, so a visitor who chose LOW has 3 stored; wrapping would
+       hand them back AUTO, while clamping lands on LOW — which is still
+       the last entry, and still what they asked for. */
+    if (i < 0) i = 0;
+    if (i >= QUALITY.length) i = QUALITY.length - 1;
     if (i) this.setQuality(i);
     return QUALITY[this.quality].name;
   }

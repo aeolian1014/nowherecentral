@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nowhere Central — snowfall test</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 15%, #121826 0%, transparent 62%),
+      radial-gradient(90% 70% at 50% 120%, #0a0f18 0%, transparent 55%),
+      #05070a;
+    color: #cfd6e2;
+    font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    display: grid; place-items: center; overflow: hidden;
+  }
+  .card { text-align: center; width: min(560px, 88vw); }
+  .kicker { font-size: 11px; letter-spacing: .34em; text-transform: uppercase; color: #5d6470; margin-bottom: 22px; }
+  h1 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(2.4rem,8vw,4rem); margin: 0 0 8px; color: #eaeef5; }
+  .sub { font-size: 12px; letter-spacing: .1em; color: #8b93a3; margin-bottom: 40px; }
+  .sub em { color: #9fb3d4; font-style: normal; }
+
+  button {
+    font: inherit; color: #eaeef5; cursor: pointer;
+    background: rgba(120,150,200,.06); border: 1px solid rgba(160,180,210,.22);
+    border-radius: 999px; padding: 16px 40px;
+    font-size: 13px; letter-spacing: .22em; text-transform: uppercase; transition: all .25s ease;
+  }
+  button:hover { border-color: #9fb3d4; background: rgba(120,150,200,.12); color: #cfe0ff; }
+
+  .meter { margin: 32px auto 0; width: 260px; height: 2px; background: rgba(160,180,210,.14); border-radius: 2px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg,#5a7bb5,#9fb3d4); transition: width .08s linear; }
+
+  .beats { display: flex; gap: 5px; justify-content: center; margin-top: 20px; }
+  .beats span { width: 5px; height: 5px; border-radius: 50%; background: rgba(160,180,210,.16); transition: all .1s ease; }
+  .beats span.on { background: #9fb3d4; box-shadow: 0 0 8px #6f8fc4; }
+
+  .now { margin-top: 22px; min-height: 1.4em; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #6f7embed; color: #6f7a8c; }
+  .foot { margin-top: 34px; font-size: 10px; letter-spacing: .14em; color: #454b57; line-height: 2; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <p class="kicker">Nowhere Central · Night Programme · Test</p>
+    <h1>Snowfall</h1>
+    <p class="sub">a written melody · <em>68 bpm · A minor · ~11 KB, no audio files</em></p>
+
+    <button id="play" type="button">▶ Play</button>
+
+    <div class="meter"><i id="level"></i></div>
+    <div class="beats" id="beats"></div>
+    <p class="now" id="now">idle</p>
+
+    <p class="foot">
+      Give it 30 seconds — pads first, then the melody comes in.<br>
+      Eight sections that build and fall away, then repeat.
+    </p>
+  </div>
+
+<script>
+/* ==================================================================
+   SNOWFALL — an actual song, not a texture
+
+   The previous attempt scattered random notes and never repeated
+   anything. That is ambience, not music: a melody you hear once and
+   never again is not a melody. This has a composed hook that comes
+   back, on a beat grid, with an arrangement that builds and breaks
+   down — which is what makes something a song.
+
+   A minor, 68 bpm. i – VI – III – VII, the melancholic four chords
+   the whole genre lives on. Everything is synthesised; the melody is
+   written, the arrangement moves it around.
+   ================================================================== */
+
+const BPM = 68;
+const SPB = 60 / BPM;              // seconds per beat
+const BEATS_PER_CHORD = 8;         // two bars of 4/4
+const CYCLE = 32;                  // four chords = one full cycle (~28s)
+
+const mtof = (n) => 440 * Math.pow(2, (n - 69) / 12);
+
+/* --- i – VI – III – VII in A minor: Am, F, C, G --- */
+const CHORDS = [
+  { root: 0,  triad: [0, 3, 7] },   // Am
+  { root: 8,  triad: [0, 4, 7] },   // F
+  { root: 3,  triad: [0, 4, 7] },   // C
+  { root: 10, triad: [0, 4, 7] },   // G
+];
+const KEY = 57;                     // A3
+
+/* --- THE HOOK ---
+   [beat, midi note, length in beats]. It arches up to G5 three
+   quarters of the way through and falls back to B4 — the shape is
+   what makes it feel sad rather than merely slow. */
+const MELODY = [
+  [0,  76, 3.0],   // E5   over Am
+  [3,  74, 1.0],   // D5
+  [4,  72, 3.6],   // C5
+  [8,  74, 3.0],   // D5   over F
+  [11, 76, 1.0],   // E5
+  [12, 72, 3.6],   // C5
+  [16, 76, 3.0],   // E5   over C
+  [19, 77, 1.0],   // F5
+  [20, 79, 3.6],   // G5   ← the lift
+  [24, 76, 3.0],   // E5   over G
+  [27, 74, 1.0],   // D5
+  [28, 71, 3.6],   // B4   resolve
+];
+
+/* --- the arrangement: eight cycles, then it repeats --- */
+const SECTIONS = [
+  { name: 'intro',      pad: 1, bass: 1, mel: 0, arp: 0, drums: 0 },
+  { name: 'theme',      pad: 1, bass: 1, mel: 1, arp: 0, drums: 0 },
+  { name: 'theme +',    pad: 1, bass: 1, mel: 1, arp: 1, drums: 0 },
+  { name: 'full',       pad: 1, bass: 1, mel: 1, arp: 1, drums: 1 },
+  { name: 'full · high',pad: 1, bass: 1, mel: 1, arp: 1, drums: 1, oct: 1 },
+  { name: 'breakdown',  pad: 1, bass: 1, mel: 1, arp: 0, drums: 0 },
+  { name: 'full',       pad: 1, bass: 1, mel: 1, arp: 1, drums: 1 },
+  { name: 'drift',      pad: 1, bass: 1, mel: 0, arp: 1, drums: 1 },
+];
+
+let ctx, master, convolver, analyser, levelBuf;
+let pad = [], running = false, tickTimer = null;
+let nextBeat = 0, beatTime = 0;
+const LOOKAHEAD = 0.25, TICK = 25;
+
+/* ---- a long convolution reverb, from decaying noise ---- */
+function makeReverb(seconds, decay) {
+  const len = Math.floor(ctx.sampleRate * seconds);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  const c = ctx.createConvolver(); c.buffer = buf; return c;
+}
+function route(node, dry, wet) {
+  const dg = ctx.createGain(); dg.gain.value = dry; node.connect(dg).connect(master);
+  const wg = ctx.createGain(); wg.gain.value = wet; node.connect(wg).connect(convolver);
+}
+
+/* ---- lead: a soft felt-piano. Three partials, a filter that closes
+        as the note decays, which is what a struck string does. ---- */
+function lead(freq, when, beats, level) {
+  const dur = beats * SPB;
+  const out = ctx.createGain();
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(3200, when);
+  lp.frequency.exponentialRampToValueAtTime(900, when + dur * 0.7);
+
+  [[1, 1], [2, 0.22], [3, 0.09], [4.01, 0.04]].forEach(([mult, amp]) => {
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq * mult;
+    const g = ctx.createGain(); g.gain.value = amp;
+    o.connect(g).connect(lp);
+    o.start(when); o.stop(when + dur + 0.4);
+  });
+
+  lp.connect(out);
+  out.gain.setValueAtTime(0.0001, when);
+  out.gain.exponentialRampToValueAtTime(level, when + 0.03);       // soft hammer
+  out.gain.exponentialRampToValueAtTime(level * 0.55, when + dur * 0.35);
+  out.gain.exponentialRampToValueAtTime(0.0001, when + dur + 0.35);
+  route(out, 0.6, 0.85);
+}
+
+/* ---- arpeggio: a quiet pluck, movement under the melody ---- */
+function pluck(freq, when, level) {
+  const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = freq;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(2200, when);
+  lp.frequency.exponentialRampToValueAtTime(500, when + 0.5);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(level, when + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.85);
+  o.connect(lp).connect(g);
+  route(g, 0.4, 0.7);
+  o.start(when); o.stop(when + 0.95);
+}
+
+function bass(freq, when, beats) {
+  const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq;
+  const g = ctx.createGain();
+  const dur = beats * SPB;
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(0.22, when + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  o.connect(g).connect(master);
+  o.start(when); o.stop(when + dur + 0.1);
+}
+
+function kick(when, level) {
+  const o = ctx.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(110, when);
+  o.frequency.exponentialRampToValueAtTime(42, when + 0.10);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.exponentialRampToValueAtTime(level, when + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.32);
+  o.connect(g).connect(master);
+  o.start(when); o.stop(when + 0.36);
+}
+
+function tick(when, level) {
+  const len = Math.floor(ctx.sampleRate * 0.05);
+  const b = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const s = ctx.createBufferSource(); s.buffer = b;
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 6000;
+  const g = ctx.createGain(); g.gain.value = level;
+  s.connect(hp).connect(g);
+  route(g, 0.5, 0.4);
+  s.start(when);
+}
+
+/* ---- chord change: glide the pad, no clicks ---- */
+function setChord(ci, when) {
+  const ch = CHORDS[ci % 4];
+  ch.triad.forEach((iv, k) => {
+    if (!pad[k]) return;
+    const f = mtof(KEY + 12 + ch.root + iv);
+    pad[k].a.frequency.setTargetAtTime(f, when, 0.8);
+    pad[k].b.frequency.setTargetAtTime(f * 1.006, when, 0.8);
+  });
+}
+
+/* ---- the sequencer: schedule one beat at a time, a little ahead ---- */
+function scheduleBeat(b, t) {
+  const pos = b % CYCLE;                       // where we are in the cycle
+  const cyc = Math.floor(b / CYCLE);
+  const S = SECTIONS[cyc % SECTIONS.length];
+  const ci = Math.floor(pos / BEATS_PER_CHORD);
+  const ch = CHORDS[ci];
+
+  if (pos % BEATS_PER_CHORD === 0) {
+    setChord(ci, t);
+    if (S.bass) bass(mtof(KEY - 12 + ch.root), t, BEATS_PER_CHORD);
+  }
+
+  if (S.mel) {
+    for (const [mb, note, len] of MELODY) {
+      if (mb !== pos) continue;
+      lead(mtof(note), t, len, 0.30);
+      if (S.oct) lead(mtof(note + 12), t + 0.02, len * 0.7, 0.09);   // octave shimmer
+    }
+  }
+
+  if (S.arp) {
+    // eighth notes through the chord, a soft rising figure
+    const shape = [0, 7, 12, 7, 15, 7, 12, 7];
+    const half = t + SPB * 0.5;
+    pluck(mtof(KEY + ch.root + shape[pos % 8]), t, 0.055);
+    pluck(mtof(KEY + ch.root + shape[(pos + 4) % 8]), half, 0.035);
+  }
+
+  if (S.drums) {
+    if (pos % 4 === 0) kick(t, 0.42);
+    if (pos % 4 === 2) kick(t, 0.22);
+    if (pos % 2 === 1) tick(t, 0.05);
+  }
+
+  // UI
+  if (pos % 4 === 0) {
+    const delay = Math.max(0, (t - ctx.currentTime) * 1000);
+    setTimeout(() => {
+      if (!running) return;
+      document.getElementById('now').textContent =
+        S.name + ' · chord ' + (ci + 1) + '/4 · cycle ' + (cyc + 1);
+      const dots = document.querySelectorAll('#beats span');
+      dots.forEach((d, i) => d.classList.toggle('on', i === ci));
+    }, delay);
+  }
+}
+
+function scheduler() {
+  while (beatTime < ctx.currentTime + LOOKAHEAD) {
+    scheduleBeat(nextBeat, beatTime);
+    nextBeat++;
+    beatTime += SPB;
+  }
+}
+
+/* ---- build the sustained layers ---- */
+function build() {
+  master = ctx.createGain(); master.gain.value = 0.0001;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -20; comp.knee.value = 22; comp.ratio.value = 4;
+  comp.attack.value = 0.012; comp.release.value = 0.35;
+
+  const warm = ctx.createBiquadFilter();     // take the glare off the top
+  warm.type = 'lowpass'; warm.frequency.value = 7200; warm.Q.value = 0.4;
+
+  analyser = ctx.createAnalyser(); analyser.fftSize = 512;
+  levelBuf = new Float32Array(analyser.fftSize);
+
+  master.connect(warm).connect(comp).connect(analyser).connect(ctx.destination);
+
+  convolver = makeReverb(6.0, 3.0);
+  const rv = ctx.createGain(); rv.gain.value = 0.95;
+  convolver.connect(rv).connect(master);
+
+  master.gain.exponentialRampToValueAtTime(0.9, ctx.currentTime + 3);
+
+  const ch0 = CHORDS[0];
+  pad = ch0.triad.map((iv, k) => {
+    const a = ctx.createOscillator(); a.type = 'sawtooth';
+    const b = ctx.createOscillator(); b.type = 'triangle';
+    const f = mtof(KEY + 12 + ch0.root + iv);
+    a.frequency.value = f; b.frequency.value = f * 1.006;
+
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = 480; lp.Q.value = 0.5;
+    lp.frequency.setTargetAtTime(1050, ctx.currentTime, 25);   // opens slowly
+
+    const g = ctx.createGain(); g.gain.value = 0.075 / (k * 0.5 + 1);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.04 + k * 0.017;
+    const lg = ctx.createGain(); lg.gain.value = g.gain.value * 0.45;
+    lfo.connect(lg).connect(g.gain);
+
+    a.connect(lp); b.connect(lp); lp.connect(g);
+    route(g, 0.55, 0.75);
+    a.start(); b.start(); lfo.start();
+    return { a, b, lp, g };
+  });
+}
+
+function meter() {
+  if (!running) return;
+  analyser.getFloatTimeDomainData(levelBuf);
+  let x = 0; for (const v of levelBuf) x += v * v;
+  document.getElementById('level').style.width =
+    Math.min(100, Math.sqrt(x / levelBuf.length) * 320) + '%';
+  requestAnimationFrame(meter);
+}
+
+function start() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  running = true;
+  build();
+  nextBeat = 0;
+  beatTime = ctx.currentTime + 0.15;
+  tickTimer = setInterval(scheduler, TICK);
+  meter();
+}
+
+function stop() {
+  running = false;
+  clearInterval(tickTimer);
+  if (master) master.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5);
+  setTimeout(() => { try { ctx.close(); } catch (e) {} }, 1400);
+  document.getElementById('level').style.width = '0%';
+  document.querySelectorAll('#beats span').forEach((d) => d.classList.remove('on'));
+  document.getElementById('now').textContent = 'idle';
+}
+
+for (let i = 0; i < 4; i++) document.getElementById('beats').appendChild(document.createElement('span'));
+
+document.getElementById('play').addEventListener('click', function () {
+  if (running) { stop(); this.textContent = '▶ Play'; }
+  else { start(); this.textContent = '■ Stop'; }
+});
+</script>
+</body>
+</html>

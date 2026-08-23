@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nowhere Central — last service</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 12%, #10141f 0%, transparent 60%),
+      radial-gradient(90% 70% at 50% 120%, #080b12 0%, transparent 55%),
+      #04060a;
+    color: #c6cddb;
+    font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    display: grid; place-items: center; overflow: hidden;
+  }
+  .card { text-align: center; width: min(560px, 88vw); }
+  .kicker { font-size: 11px; letter-spacing: .34em; text-transform: uppercase; color: #545b68; margin-bottom: 22px; }
+  h1 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(2.4rem,8vw,4rem); margin: 0 0 8px; color: #e4e9f2; }
+  .sub { font-size: 12px; letter-spacing: .1em; color: #7d8595; margin-bottom: 36px; }
+  .sub em { color: #94a8c9; font-style: normal; }
+
+  button {
+    font: inherit; color: #e4e9f2; cursor: pointer;
+    background: rgba(110,140,190,.06); border: 1px solid rgba(150,170,200,.2);
+    border-radius: 999px; padding: 16px 40px;
+    font-size: 13px; letter-spacing: .22em; text-transform: uppercase; transition: all .25s ease;
+  }
+  button:hover { border-color: #94a8c9; background: rgba(110,140,190,.12); color: #c8daff; }
+
+  .meter { margin: 30px auto 0; width: 260px; height: 2px; background: rgba(150,170,200,.12); border-radius: 2px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg,#4a6699,#94a8c9); transition: width .12s linear; }
+
+  .beats { display: flex; gap: 6px; justify-content: center; margin-top: 18px; }
+  .beats span { width: 5px; height: 5px; border-radius: 50%; background: rgba(150,170,200,.14); transition: all .4s ease; }
+  .beats span.on { background: #94a8c9; box-shadow: 0 0 10px #5d7cb0; }
+
+  .now { margin-top: 20px; min-height: 1.4em; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #69738a; }
+  .clock { margin-top: 6px; font-size: 11px; letter-spacing: .18em; color: #454d5e; }
+
+  .opts { margin-top: 26px; font-size: 10px; letter-spacing: .14em; color: #5b6373; }
+  .opts label { cursor: pointer; user-select: none; }
+  .opts input { accent-color: #5d7cb0; vertical-align: -2px; margin-right: 6px; }
+
+  .foot { margin-top: 26px; font-size: 10px; letter-spacing: .13em; color: #3d4453; line-height: 2; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <p class="kicker">Nowhere Central · Night Programme · Test 2</p>
+    <h1>Last Service</h1>
+    <p class="sub">ambient · <em>70 bpm · D minor · no audio files</em></p>
+
+    <button id="play" type="button">▶ Play</button>
+
+    <div class="meter"><i id="level"></i></div>
+    <div class="beats" id="beats"></div>
+    <p class="now" id="now">idle</p>
+    <p class="clock" id="clock">00:00</p>
+
+    <p class="opts">
+      <label><input type="checkbox" id="sleep"> fade out at 22:00, silent by 25:00</label>
+    </p>
+
+    <p class="foot">
+      Headphones. Give it 90 seconds — the hiss and pad come first,<br>
+      the piano doesn't enter until the third section.
+    </p>
+  </div>
+
+<script>
+/* ==================================================================
+   LAST SERVICE — an original ambient piece
+
+   Written for the genre the site's night programme wants: slow, dark,
+   lonely. What actually makes that sound is not the notes — it is the
+   noise floor, the tape drift, and the length of the reverb tail. A
+   clean synth playing sad chords sounds like a synth. The same chords
+   through hiss, wow-and-flutter and a nine-second dark tail sound like
+   a memory of a song.
+
+   D minor. i(add9) - VI(maj7) - III(maj7) - VII(add9), which is the
+   melancholic four-chord loop with the sevenths left in. The sevenths
+   are the difference between sad and merely minor.
+
+   Seven melody notes per 27-second cycle. That is deliberate. The
+   space between them is the instrument.
+   ================================================================== */
+
+const BPM = 70;
+const SPB = 60 / BPM;              // 0.857s
+const BEATS_PER_CHORD = 8;
+const CYCLE = 32;                  // four chords ≈ 27.4s
+
+const mtof = (n) => 440 * Math.pow(2, (n - 69) / 12);
+const KEY  = 50;                   // D3
+
+/* --- the progression, voiced close so the pad never leaps --- */
+const CHORDS = [
+  { name: 'Dm9',     root:  0, iv: [0, 3, 7, 14] },   // D  F  A  E
+  { name: 'B♭maj7',  root: -4, iv: [0, 4, 7, 11] },   // B♭ D  F  A
+  { name: 'Fmaj7',   root:  3, iv: [0, 4, 7, 11] },   // F  A  C  E
+  { name: 'Cadd9',   root: -2, iv: [0, 4, 7, 14] },   // C  E  G  D
+];
+
+/* --- THE MOTIF ---
+   [beat, midi, length in beats]. It falls (D5→C5→A4), rests, climbs
+   back only as far as it fell (C5→A4), reaches once for E5, then drops
+   to D5 — the ninth of Cadd9, which does not resolve. It hands you
+   back to the Dm still hanging. That unresolved handoff is why it can
+   loop for twenty-five minutes without ever feeling finished. */
+const MELODY = [
+  [0,  74, 5.0],   // D5  over Dm9      — root, alone
+  [5,  72, 3.0],   // C5                — the flat seventh
+  [8,  69, 6.0],   // A4  over B♭maj7   — the major seventh, aching
+  //   beats 14-16: silence. leave it.
+  [16, 72, 5.0],   // C5  over Fmaj7    — fifth
+  [21, 69, 3.0],   // A4                — third
+  [24, 76, 6.0],   // E5  over Cadd9    — the one lift in the whole piece
+  [30, 74, 2.4],   // D5                — falls back, unresolved
+];
+
+/* --- a low answer, used only when the pad drops out --- */
+const ANSWER = [
+  [2,  57, 6.0],   // A3
+  [10, 53, 6.0],   // F3
+  [18, 55, 6.0],   // G3
+  [26, 50, 6.0],   // D3
+];
+
+/* --- eight sections ≈ 3m40s, then it repeats --- */
+const SECTIONS = [
+  { name: 'distance',    pad: .55, sub: 0,  mel: 0, ans: 0, air: .5 },
+  { name: 'first light', pad: .8,  sub: .7, mel: 0, ans: 0, air: .7 },
+  { name: 'theme',       pad: .9,  sub: .9, mel: 1, ans: 0, air: .8 },
+  { name: 'theme',       pad: 1,   sub: 1,  mel: 1, ans: 0, air: .9 },
+  { name: 'swell',       pad: 1,   sub: 1,  mel: 1, ans: 0, air: 1, oct: 1 },
+  { name: 'hollow',      pad: .25, sub: .5, mel: 1, ans: 1, air: .6 },
+  { name: 'full',        pad: 1,   sub: 1,  mel: 1, ans: 0, air: 1, oct: 1 },
+  { name: 'leaving',     pad: .7,  sub: .6, mel: 0, ans: 1, air: .7 },
+];
+
+let ctx, master, warm, comp, analyser, levelBuf;
+let convolver, revIn, revGain;
+let pad = [], sub = null, air = null, airGain = null;
+let wow = null;                                  // tape drift, shared
+let running = false, tickTimer = null, startedAt = 0;
+let nextBeat = 0, beatTime = 0, sleepMode = false;
+const LOOKAHEAD = 0.3, TICK = 25;
+
+/* ---- reverb: nine seconds, and dark.
+        The one-pole filter inside the impulse is the whole trick — a
+        tail built from raw white noise sounds like a cathedral made of
+        glass. Filtered as it decays, it sounds like a room. ---- */
+function makeReverb(seconds, decay, damp) {
+  const len = Math.floor(ctx.sampleRate * seconds);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < len; i++) {
+      lp += ((Math.random() * 2 - 1) - lp) * damp;
+      d[i] = lp * Math.pow(1 - i / len, decay);
+    }
+  }
+  const c = ctx.createConvolver();
+  c.buffer = buf;
+  return c;
+}
+
+function route(node, dry, wet) {
+  const dg = ctx.createGain(); dg.gain.value = dry; node.connect(dg).connect(master);
+  const wg = ctx.createGain(); wg.gain.value = wet; node.connect(wg).connect(revIn);
+}
+
+/* ---- wow & flutter: two slow LFOs at rates that never line up, so
+        the drift never settles into a pattern you can hear. Output is
+        in cents, patched into every pitched voice's detune. ---- */
+function buildWow() {
+  wow = ctx.createGain(); wow.gain.value = 1;
+  [[0.071, 5.5], [0.233, 2.2], [0.017, 3.0]].forEach(([rate, cents]) => {
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = rate;
+    const g = ctx.createGain(); g.gain.value = cents;
+    o.connect(g).connect(wow);
+    o.start();
+  });
+}
+
+/* ---- the noise floor: tape hiss plus occasional dust.
+        Level is absurdly low. You should not hear it; you should hear
+        its absence when it stops. ---- */
+function buildAir() {
+  const len = Math.floor(ctx.sampleRate * 4);
+  const b = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < len; i++) {
+      lp += ((Math.random() * 2 - 1) - lp) * 0.22;   // pinkish, not white
+      d[i] = lp * 0.8;
+    }
+  }
+  air = ctx.createBufferSource(); air.buffer = b; air.loop = true;
+
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
+  bp.frequency.value = 2600; bp.Q.value = 0.35;
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
+
+  airGain = ctx.createGain(); airGain.gain.value = 0.0001;
+
+  // the hiss breathes very slightly, as tape does
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.043;
+  const lg = ctx.createGain(); lg.gain.value = 0.0016;
+  lfo.connect(lg).connect(airGain.gain); lfo.start();
+
+  air.connect(bp).connect(hp).connect(airGain);
+  route(airGain, 0.9, 0.25);
+  air.start();
+}
+
+/* ---- dust: a single click, the kind a record makes ---- */
+function dust(when) {
+  const len = Math.floor(ctx.sampleRate * 0.006);
+  const b = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+  const s = ctx.createBufferSource(); s.buffer = b;
+  const bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
+  bp.frequency.value = 1400 + Math.random() * 2600; bp.Q.value = 1.1;
+  const g = ctx.createGain(); g.gain.value = 0.006 + Math.random() * 0.012;
+  const pan = ctx.createStereoPanner(); pan.pan.value = Math.random() * 1.6 - 0.8;
+  s.connect(bp).connect(g).connect(pan);
+  route(pan, 0.8, 0.5);
+  s.start(when);
+}
+
+/* ---- felt piano.
+        Real piano partials do not decay together — the top ones die
+        first, which is why a struck note gets darker as it rings. Each
+        partial here gets its own decay scale. The noise burst at the
+        front is the hammer felt, and it is most of what sells it. ---- */
+function piano(freq, when, beats, level) {
+  const dur = beats * SPB;
+  const out = ctx.createGain();
+
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(2400, when);
+  lp.frequency.exponentialRampToValueAtTime(620, when + dur * 0.6);
+  lp.Q.value = 0.3;
+
+  // [multiple, amplitude, decay scale] — inharmonic top partial on purpose
+  [[1, 1, 1], [2, 0.26, 0.55], [3, 0.095, 0.38], [4, 0.042, 0.26], [5.43, 0.015, 0.18]]
+    .forEach(([mult, amp, ds]) => {
+      const o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.value = freq * mult;
+      wow.connect(o.detune);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(amp, when + 0.014);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur * ds + 0.6);
+      o.connect(g).connect(lp);
+      o.start(when); o.stop(when + dur + 0.9);
+    });
+
+  // hammer felt
+  const hl = Math.floor(ctx.sampleRate * 0.03);
+  const hb = ctx.createBuffer(1, hl, ctx.sampleRate);
+  const hd = hb.getChannelData(0);
+  for (let i = 0; i < hl; i++) hd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / hl, 4);
+  const hs = ctx.createBufferSource(); hs.buffer = hb;
+  const hf = ctx.createBiquadFilter(); hf.type = 'bandpass';
+  hf.frequency.value = freq * 2.4; hf.Q.value = 0.8;
+  const hg = ctx.createGain(); hg.gain.value = 0.05;
+  hs.connect(hf).connect(hg).connect(lp);
+  hs.start(when);
+
+  lp.connect(out);
+  out.gain.setValueAtTime(level, when);
+  out.gain.setTargetAtTime(0.0001, when + dur * 0.8, dur * 0.3);
+
+  // wetter than is normal. that is the point.
+  route(out, 0.42, 1.05);
+}
+
+/* ---- chord change: glide, never jump ---- */
+function setChord(ci, when) {
+  const ch = CHORDS[ci % 4];
+  ch.iv.forEach((iv, k) => {
+    if (!pad[k]) return;
+    const f = mtof(KEY + 12 + ch.root + iv);
+    pad[k].a.frequency.setTargetAtTime(f, when, 1.6);
+    pad[k].b.frequency.setTargetAtTime(f * 1.0045, when, 1.6);
+  });
+  if (sub) sub.o.frequency.setTargetAtTime(mtof(KEY - 12 + ch.root), when, 1.2);
+}
+
+/* ---- the sequencer ---- */
+function scheduleBeat(b, t) {
+  const pos = b % CYCLE;
+  const cyc = Math.floor(b / CYCLE);
+  const S = SECTIONS[cyc % SECTIONS.length];
+  const ci = Math.floor(pos / BEATS_PER_CHORD);
+
+  if (pos % BEATS_PER_CHORD === 0) {
+    setChord(ci, t);
+    pad.forEach((p) => p.g.gain.setTargetAtTime(p.base * S.pad, t, 2.5));
+    if (sub) sub.g.gain.setTargetAtTime(0.0001 + 0.16 * S.sub, t, 2.5);
+    if (airGain) airGain.gain.setTargetAtTime(0.0022 * S.air, t, 3.0);
+  }
+
+  if (S.mel) {
+    for (const [mb, note, len] of MELODY) {
+      if (mb !== pos) continue;
+      // humanise: a real player is never exactly on the grid
+      const jit = (Math.random() - 0.5) * 0.035;
+      const vel = 0.26 * (0.88 + Math.random() * 0.24);
+      piano(mtof(note), t + jit, len, vel);
+      if (S.oct) piano(mtof(note + 12), t + jit + 0.045, len * 0.6, vel * 0.2);
+    }
+  }
+
+  if (S.ans) {
+    for (const [ab, note, len] of ANSWER) {
+      if (ab !== pos) continue;
+      piano(mtof(note), t + (Math.random() - 0.5) * 0.04, len, 0.15);
+    }
+  }
+
+  // dust, a few specks per bar, never on the grid
+  if (Math.random() < 0.55) dust(t + Math.random() * SPB);
+
+  if (pos % BEATS_PER_CHORD === 0) {
+    const delay = Math.max(0, (t - ctx.currentTime) * 1000);
+    setTimeout(() => {
+      if (!running) return;
+      document.getElementById('now').textContent =
+        S.name + ' · ' + CHORDS[ci].name + ' · cycle ' + (cyc + 1);
+      document.querySelectorAll('#beats span')
+        .forEach((d, i) => d.classList.toggle('on', i === ci));
+    }, delay);
+  }
+}
+
+function scheduler() {
+  while (beatTime < ctx.currentTime + LOOKAHEAD) {
+    scheduleBeat(nextBeat, beatTime);
+    nextBeat++;
+    beatTime += SPB;
+  }
+}
+
+function build() {
+  master = ctx.createGain(); master.gain.value = 0.0001;
+
+  warm = ctx.createBiquadFilter();
+  warm.type = 'lowpass'; warm.frequency.value = 5200; warm.Q.value = 0.4;
+
+  comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -24; comp.knee.value = 26; comp.ratio.value = 3;
+  comp.attack.value = 0.05; comp.release.value = 0.8;     // slow: no pumping
+
+  analyser = ctx.createAnalyser(); analyser.fftSize = 512;
+  levelBuf = new Float32Array(analyser.fftSize);
+
+  master.connect(warm).connect(comp).connect(analyser).connect(ctx.destination);
+
+  // reverb bus: pre-delay → convolver → damped → back to master
+  revIn = ctx.createDelay(0.2); revIn.delayTime.value = 0.04;
+  convolver = makeReverb(9.0, 2.6, 0.30);
+  const damp = ctx.createBiquadFilter();
+  damp.type = 'lowpass'; damp.frequency.value = 2300; damp.Q.value = 0.3;
+  revGain = ctx.createGain(); revGain.gain.value = 0.85;
+  revIn.connect(convolver).connect(damp).connect(revGain).connect(master);
+
+  buildWow();
+  buildAir();
+
+  // sustained sub — never retriggered, just glides. sleep-safe.
+  {
+    const o = ctx.createOscillator(); o.type = 'sine';
+    o.frequency.value = mtof(KEY - 12);
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 200;
+    o.connect(lp).connect(g).connect(master);
+    o.start();
+    sub = { o, g, lp };
+  }
+
+  // pad: four voices, very dark, each breathing at its own rate
+  const ch0 = CHORDS[0];
+  pad = ch0.iv.map((iv, k) => {
+    const a = ctx.createOscillator(); a.type = 'triangle';
+    const b = ctx.createOscillator(); b.type = 'sine';
+    const f = mtof(KEY + 12 + ch0.root + iv);
+    a.frequency.value = f; b.frequency.value = f * 1.0045;
+    wow.connect(a.detune); wow.connect(b.detune);
+
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.value = 300; lp.Q.value = 0.4;
+    lp.frequency.setTargetAtTime(680, ctx.currentTime, 40);   // opens over a minute
+
+    const base = 0.085 / (k * 0.45 + 1);
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.031 + k * 0.013;
+    const lg = ctx.createGain(); lg.gain.value = base * 0.5;
+    lfo.connect(lg).connect(g.gain); lfo.start();
+
+    a.connect(lp); b.connect(lp); lp.connect(g);
+    route(g, 0.5, 0.9);
+    a.start(); b.start();
+    return { a, b, lp, g, base };
+  });
+
+  master.gain.exponentialRampToValueAtTime(0.85, ctx.currentTime + 8);   // long fade in
+}
+
+function meter() {
+  if (!running) return;
+  analyser.getFloatTimeDomainData(levelBuf);
+  let x = 0; for (const v of levelBuf) x += v * v;
+  document.getElementById('level').style.width =
+    Math.min(100, Math.sqrt(x / levelBuf.length) * 420) + '%';
+
+  const el = Math.floor(ctx.currentTime - startedAt);
+  document.getElementById('clock').textContent =
+    String(Math.floor(el / 60)).padStart(2, '0') + ':' + String(el % 60).padStart(2, '0');
+
+  requestAnimationFrame(meter);
+}
+
+function start() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  running = true;
+  sleepMode = document.getElementById('sleep').checked;
+  build();
+  startedAt = ctx.currentTime;
+  nextBeat = 0;
+  beatTime = ctx.currentTime + 0.4;
+  tickTimer = setInterval(scheduler, TICK);
+
+  if (sleepMode) {
+    // 22 minutes in, begin a three-minute fade. no cliff, no wake-up.
+    master.gain.setTargetAtTime(0.0001, ctx.currentTime + 22 * 60, 55);
+    setTimeout(() => { if (running) document.getElementById('play').click(); }, 25 * 60 * 1000);
+  }
+  meter();
+}
+
+function stop() {
+  running = false;
+  clearInterval(tickTimer);
+  if (master) master.gain.setTargetAtTime(0.0001, ctx.currentTime, 1.2);
+  setTimeout(() => { try { ctx.close(); } catch (e) {} }, 4000);
+  document.getElementById('level').style.width = '0%';
+  document.querySelectorAll('#beats span').forEach((d) => d.classList.remove('on'));
+  document.getElementById('now').textContent = 'idle';
+}
+
+for (let i = 0; i < 4; i++) document.getElementById('beats').appendChild(document.createElement('span'));
+
+document.getElementById('play').addEventListener('click', function () {
+  if (running) { stop(); this.textContent = '▶ Play'; }
+  else { start(); this.textContent = '■ Stop'; }
+});
+</script>
+</body>
+</html>

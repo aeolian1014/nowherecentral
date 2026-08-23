@@ -933,6 +933,31 @@ export class Station {
    *   dur — the whole pass, first hearing it to losing it again.
    *   far — 0..1, how distant.
    */
+  /* Cut a pass short. The train is wired straight to the master, past
+     the ambience bus, precisely so ducking cannot reach it — which means
+     leaving the concourse has to stop it explicitly or it plays on
+     underneath a destination for its full fifteen to twenty seconds. */
+  stopTrain(fade = 0.6) {
+    if (!this.ready || !this._train) return;
+    const now = this.ctx.currentTime;
+    const bus = this._trainBus, horn = this._trainHornBus, lvl = this._trainLvl;
+    clearInterval(this._train);
+    this._train = null;
+    this._trainBus = this._trainHornBus = this._trainLvl = null;
+    try {
+      if (lvl) {
+        lvl.gain.cancelScheduledValues(now);
+        lvl.gain.setTargetAtTime(0.0001, now, fade / 3);
+      }
+      // the pass ducks the ambience as it goes by; hand that back
+      this.bus.gain.cancelScheduledValues(now);
+      this.bus.gain.setTargetAtTime(1, now, 0.4);
+    } catch (e) {}
+    setTimeout(() => {
+      try { bus && bus.disconnect(); horn && horn.disconnect(); lvl && lvl.disconnect(); } catch (e) {}
+    }, (fade + 0.5) * 1000);
+  }
+
   steamTrain({ dur = rand(15, 20), far = rand(0.74, 0.94) } = {}) {
     if (!this.ready || !this.enabled) return;
     if (this._train) return;                       // one at a time
@@ -969,6 +994,7 @@ export class Station {
     lvl.connect(send).connect(this.hall);
 
     this._trainBus = bus;
+    this._trainLvl = lvl;                          // needed to cut a pass short
 
     /* ---- distance envelope ----
        A gentle falloff, not a literal inverse square. True 1/r² spends

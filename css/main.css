@@ -120,6 +120,22 @@ body.no-gl {
    1. Layout primitives
 ------------------------------------------------------------------ */
 
+/* Render only what is on screen. The board alone is ~2000 elements, and
+   without this the browser lays out and paints every section on every
+   frame that touches them, whether or not any of it is visible.
+
+   `contain-intrinsic-size: auto <n>` makes the browser remember each
+   section's real height once it has been rendered, so the scrollbar
+   does not jump the first time a section is skipped. The hero is
+   deliberately excluded — it is on screen at load, and containing it
+   would only add work. */
+.board-section,
+.sec {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
+
 .stage {
   position: relative;
   z-index: 2;
@@ -267,6 +283,25 @@ body.no-gl {
   font-size: var(--fs-2xs);
   letter-spacing: 0.12em;
   color: var(--text-dim);
+}
+
+/* An advisory, not another keyboard hint — it has to read before the
+   visitor decides, so it sits above the shortcut list and carries the
+   accent. Still quiet: this is a boot screen at two in the morning. */
+.boot-note {
+  color: var(--accent);
+  opacity: 0.85;
+  /* Tighter tracking than the hints so it stays on one line — wrapping
+     doubles the block height on top of the type size and reads far
+     larger than the number suggests. */
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-wrap: balance;
+}
+.boot-note::before {
+  content: '◈';
+  margin-right: 0.7em;
+  opacity: 0.7;
 }
 
 /* ------------------------------------------------------------------
@@ -492,6 +527,190 @@ body.no-gl {
   pointer-events: none;
 }
 
+/* ==================================================================
+   THE REEL — what an arrival was carrying
+
+   The vignette and the scanlines are children of .reel-stage, which
+   is locked to 16:9. They therefore track the picture and not the
+   window, which is the whole reason the stage exists as its own box
+   rather than the media filling the panel directly.
+   ================================================================== */
+/* Entered, not opened — same shape as #arrival, one z-layer above it.
+   visibility (not display) so it can cross-fade, and so it is never a
+   full-screen click trap while closed. */
+.reel {
+  position: fixed;
+  inset: 0;
+  z-index: 52;
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--d-slow) var(--ease-std), visibility var(--d-slow);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.reel.open { opacity: 1; visibility: visible; }
+
+/* the screen you walked into: black room, one lit rectangle */
+.reel-bg {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #000;
+  pointer-events: none;
+}
+.reel.open .reel-bg { pointer-events: auto; }
+
+/* a bed for the type, exactly as #arrival does over a world */
+.reel-inner {
+  position: relative;
+  min-height: 100svh;
+  width: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: var(--sp-8) var(--gutter) var(--sp-6);
+  max-width: 1560px;
+  margin: 0 auto;
+  pointer-events: none;
+}
+/* The type bed is a fixed ::before, so the chrome has to be positioned
+   to sit on top of it rather than under it. */
+.reel-inner > * { pointer-events: auto; position: relative; z-index: 1; }
+.reel-inner::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(102deg, rgba(5, 7, 10, 0.88) 0%, rgba(5, 7, 10, 0.62) 34%,
+      rgba(5, 7, 10, 0.16) 62%, rgba(5, 7, 10, 0.44) 100%),
+    linear-gradient(180deg, rgba(5, 7, 10, 0.70) 0%, transparent 24%, transparent 72%, rgba(5, 7, 10, 0.78) 100%);
+}
+.reel-body { position: relative; align-self: center; max-width: 46ch; }
+.reel-body h2 { margin: 0 0 var(--sp-3); font-size: clamp(1.8rem, 5vw, 3.4rem); }
+.reel-body p  { margin: 0 0 var(--sp-3); color: var(--text-dim); }
+.reel-line    { color: var(--accent) !important; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: var(--tracking-wide); }
+
+/* Full bleed. An earlier version locked this to the largest 16:9 box the
+   viewport would hold, which pillarboxed every window wider than 16:9.
+   The media is object-fit: cover, so it fills any shape and the vignette
+   rides the picture either way. */
+.reel-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+.reel-media { position: absolute; inset: 0; }
+.reel-media > * {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scale(1.08);          /* headroom so the parallax never shows an edge */
+  will-change: transform;
+}
+
+/* vignette, sized to the 16:9 box */
+.reel-vig {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 100% at 50% 50%, transparent 38%, rgba(0,0,0,0.34) 72%, rgba(0,0,0,0.82) 100%),
+    linear-gradient(180deg, rgba(0,0,0,0.30), transparent 22%, transparent 74%, rgba(0,0,0,0.46));
+}
+
+/* Plain alpha, not mix-blend-mode: a blend mode over live video forces
+   a full re-composite of every decoded frame — the same reason #cursor
+   uses a flat colour over the canvas. On footage this dark the two are
+   visually indistinguishable. */
+.reel-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: repeating-linear-gradient(
+    180deg, rgba(0,0,0,0.26) 0 1px, transparent 1px 3px);
+}
+
+/* --- the tape treatment, only on the two stills that ask for it --- */
+.reel-stage.tape .reel-scan { opacity: 0.5; }
+.reel-stage.tape .reel-media { animation: reel-flicker 5.7s steps(1, end) infinite; }
+@keyframes reel-flicker {
+  0%,  100% { filter: brightness(1)     saturate(1);    }
+  17%       { filter: brightness(1.035) saturate(0.97); }
+  19%       { filter: brightness(0.975) saturate(1.02); }
+  46%       { filter: brightness(1.02)  saturate(1);    }
+  47%       { filter: brightness(0.99)  saturate(0.99); }
+  73%       { filter: brightness(1.045) saturate(0.98); }
+  75%       { filter: brightness(0.985) saturate(1.01); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel { transition: none; }
+  .reel-media > * { transform: none; }
+  .reel-stage.tape .reel-media { animation: none; }
+}
+
+/* --- board tabs ---------------------------------------------------
+   Two boards, one shell. The underline slides rather than cuts, so
+   the switch reads as the same board changing its mind rather than
+   two boards swapping places. */
+.board-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 22rem;
+  margin: var(--sp-5) var(--sp-5) 0;
+  border-bottom: 1px solid var(--border);
+}
+.board-tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  transition: color var(--d-med) ease, opacity var(--d-med) ease;
+}
+.board-tab:hover { color: var(--text); }
+.board-tab.on { color: var(--accent); }
+.board-tab:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.board-tabs-ink {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 50%;
+  height: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  transition: transform var(--d-med) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Nothing on the arrivals board is going anywhere, so the row does not
+   pretend it might: no lift on hover, and the marker stays cold. */
+.board-row.arr::before { background: var(--ink-600); }
+.board-row.arr:hover::before { height: 44%; }
+.board-row.arr .idx { opacity: 0.55; }
+.board-row.arr:hover .idx { color: var(--text-dim); }
+.board-row.arr [data-role='status'],
+.board-row.arr [data-role='plat'] { opacity: 0.72; }
+
+@media (prefers-reduced-motion: reduce) {
+  .board-tabs-ink { transition: none; }
+}
+
 .board-scroll {
   overflow-x: auto;
   overflow-y: hidden;
@@ -529,7 +748,12 @@ body.no-gl {
   text-align: left;
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-sm);
-  transition: background-color var(--d-fast) var(--ease-std), opacity var(--d-med) var(--ease-std),
+  /* No background-color here. Each row holds ~300 flap elements, and
+     tinting the row itself repaints that whole subtree on every hover —
+     which is what made the pointer feel heavy over the board. The tint
+     is an ::after layer animated on opacity instead, which the
+     compositor handles without repainting any children. */
+  transition: opacity var(--d-med) var(--ease-std),
     transform var(--d-med) var(--ease-out), filter var(--d-med) var(--ease-std);
 }
 .board-row + .board-row { margin-top: var(--flap-gap); }
@@ -543,7 +767,18 @@ body.no-gl {
   transform: translateY(-50%);
   transition: height var(--d-fast) var(--ease-out);
 }
-.board-row:hover { background: rgba(255, 255, 255, 0.035); }
+.board-row::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;                       /* behind the flaps, above the shell */
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.035);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-fast) var(--ease-std);
+}
+.board-row:hover::after { opacity: 1; }
 .board-row:hover::before { height: 72%; }
 
 /* header cells must match the flap runs exactly: n cells + (n-1) 1px gaps */

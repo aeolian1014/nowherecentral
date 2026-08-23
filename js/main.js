@@ -2,12 +2,16 @@
    NOWHERE CENTRAL — conductor
 ------------------------------------------------------------------ */
 
-import { DESTINATIONS, STATUSES, LOST_AND_FOUND, NOTICES, COUNTER_PROMPTS } from './data.js';
+import {
+  DESTINATIONS, STATUSES, LOST_AND_FOUND, NOTICES, COUNTER_PROMPTS,
+  ARRIVALS, NIGHT_OPENER, NIGHT_LINES,
+} from './data.js';
 import { FlapLine } from './board.js';
 import { Renderer } from './gl.js';
 import { Station } from './audio.js';
-import { Announcer, welcomeLine, departureLine } from './voice.js';
+import { Announcer, welcomeLine } from './voice.js';
 import { SCENE_OF } from './scenes.js';
+import { initReel, showReel, hideReel, reelOpen, reelAudio, reelRetier } from './reel.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -134,14 +138,22 @@ function enterStation() {
   /* The arrival sequence: two-tone chime, then the announcer reads the
      next service off the board she is standing under. Fifteen seconds
      after she finishes, the first train comes through. */
+  /* The welcome sits behind ~3s of timers, so cancelling the announcer on
+     boarding does nothing — at that point she has not started, and the
+     queued line fires afterwards from inside a destination. The gate has
+     to be re-checked at every step, not just once. */
+  const stillOnConcourse = () => !currentDest && !currentArrival && !reelOpen();
+
   setTimeout(async () => {
+    if (!stillOnConcourse()) return;
     station.chime();
     await wait(2100);                       // let the chime ring out
-    buildBoard();
-    const next = rows[0];
+    if (!stillOnConcourse()) return;        // boarded while the chime rang
+    buildArrivals();                        // the board she is standing under
+    const next = arrRows[0];
     await announce(
       'Welcome to Nowhere Central. The board is live.',
-      { speak: next ? welcomeLine(next.d, next.depart) : 'Welcome to Nowhere Central.' }
+      { speak: next ? welcomeLine(next.a, next.depart) : 'Welcome to Nowhere Central.' }
     );
     trainDueIn(15000);
   }, 900);
@@ -150,7 +162,7 @@ function enterStation() {
     buildBoard();
     // if the board is already on screen there is nothing to wait for
     const shell = $('#board-shell').getBoundingClientRect();
-    if (shell.top < innerHeight - 60) populateBoard();
+    if (shell.top < innerHeight - 60) populateVisible();
   }, 500);
 }
 
@@ -197,12 +209,9 @@ function buildBoard() {
   });
 }
 
-let boardFilled = false;
-function populateBoard() {
-  if (boardFilled || !rows.length) return;
-  boardFilled = true;
+function fillDepartures(from = 0) {
   rows.forEach((r, i) => {
-    const base = i * 90;
+    const base = from + i * 90;
     r.time.set(hhmm(r.depart), { from: base });
     r.dest.set(r.d.name, { from: base + 60 });
     r.plat.set(r.d.platform, { from: base + 120 });
@@ -210,10 +219,250 @@ function populateBoard() {
   });
 }
 
+let boardFilled = false;
+function populateBoard() {
+  if (boardFilled || !rows.length) return;
+  boardFilled = true;
+  fillDepartures(0);
+}
+
+let arrFilled = false;
+function populateArrivals() {
+  if (arrFilled || !arrRows.length) return;
+  arrFilled = true;
+  fillArrivals(0);
+}
+
+/* Fill whichever board is actually on screen. The default view is the
+   media board now, so filling `rows` on entry would have flapped up a
+   board sitting behind a hidden tab while the visible one stayed blank. */
+function populateVisible() {
+  if (boardView === 'media') { buildArrivals(); populateArrivals(); }
+  else { buildBoard(); populateBoard(); }
+}
+
+/* ================================================================
+   The other board
+
+   Departures sends you somewhere invented. Arrivals lists services
+   from places you actually had, and not one of them lands — so these
+   rows navigate nowhere. Pressing one gets the announcer saying no,
+   which is the entire content of the panel.
+   ================================================================ */
+const arrRows = [];
+let arrBuilt = false;
+
+function buildArrivals() {
+  if (arrBuilt) return;
+  arrBuilt = true;
+  const host = $('#arr-rows');
+  ARRIVALS.forEach((a, i) => {
+    const row = document.createElement('button');
+    row.className = 'board-row arr';
+    row.type = 'button';
+    row.dataset.id = a.id;
+    row.setAttribute('aria-label', `Arrival ${i + 1} from ${a.name}. ${a.status}.`);
+
+    const idx = document.createElement('span');
+    idx.className = 'idx w-idx';
+    idx.textContent = String(i + 1).padStart(2, '0');
+    row.appendChild(idx);
+
+    const onFlip = () => station.click();
+    const time = new FlapLine(row, COLS.time, { role: 'time', onFlip });
+    const dest = new FlapLine(row, COLS.dest, { role: 'dest', onFlip });
+    const plat = new FlapLine(row, COLS.plat, { role: 'plat', align: 'center', onFlip });
+    const stat = new FlapLine(row, COLS.status, { role: 'status', onFlip });
+
+    const depart = new Date(Date.now() + a.offset * 60000);
+    arrRows.push({ a, row, time, dest, plat, stat, depart, status: a.status });
+
+    row.addEventListener('click', () => arrive_at(a.id));
+    row.addEventListener('pointerenter', () => station.click());
+    host.appendChild(row);
+  });
+}
+
+function fillArrivals(from = 0) {
+  arrRows.forEach((r, i) => {
+    const base = from + i * 90;
+    r.time.set(hhmm(r.depart), { from: base });
+    r.dest.set(r.a.name, { from: base + 60 });
+    r.plat.set('—', { from: base + 120 });
+    r.stat.set(r.status, { from: base + 150 });
+  });
+}
+
+/* ---- entering an arrival -----------------------------------------
+   The same choreography as a departure, beat for beat, because it is
+   the same act: the board dims, the chosen row stays lit, the frame
+   pulls apart and lets go. The only difference is what is on the far
+   side — a destination hands the frame to a GLSL world, an arrival
+   hands it to a screen with footage on it. */
+let currentArrival = null;
+
+async function arrive_at(id) {
+  if (inTransit || quietOpen || !entered || performance.now() < gateUntil) return;
+  if (boardView !== 'media') return;             // only from the board showing it
+  buildArrivals();
+  populateArrivals();
+  const entry = arrRows.find((r) => r.a.id === id);
+  if (!entry) return;
+  const a = entry.a;
+  inTransit = true;
+  currentArrival = a;
+
+  station.enable();
+  station.stopTrain();                           // a pass in flight does not follow you
+  announcer.cancel();                            // she does not follow you out
+  /* No chime, and no setWorld: setWorld tears down every layer and
+     fades the new ones up over 1.6s, which is the sound that grows in
+     after you enter. In a reel the station bus is muted outright, so
+     only the music bed and the voice cues are audible. */
+  announce(`${a.name}. ${a.note}`);
+
+  const shell = $('#board-shell');
+  $$('.board-row').forEach((el) => el.classList.remove('chosen'));
+  entry.row.classList.add('chosen');
+  shell.classList.add('departing');
+
+  entry.stat.set('ARRIVING', { stagger: 14 });   // the one time it ever does
+
+  await wait(REDUCED ? 60 : 900);
+  /* No station.depart() here — that is the rising sweep, and over a
+     music bed it reads as a whoosh rather than a train. The world
+     board keeps it; a reel is a screen, not a departure. */
+
+  if (REDUCED || !gl.ok) {
+    showReel(a);
+    shell.classList.remove('departing');
+    gl.ok && gl.stop();
+    inTransit = false;
+    return;
+  }
+
+  await tween({
+    from: 0, to: 1, dur: 1250, ease: easeIn,
+    onUpdate: (v) => { gl.warp = v; gl.fade = Math.max(0, (v - 0.72) / 0.28) * 0.9; },
+  });
+
+  gl.flash = 0.85;
+  showReel(a);
+  shell.classList.remove('departing');
+
+  await tween({
+    from: 1, to: 0, dur: 1400, ease: easeOut,
+    onUpdate: (v) => { gl.warp = v * 0.55; gl.fade = v * 0.5; gl.flash = v * 0.85; },
+  });
+  gl.warp = 0; gl.fade = 0; gl.flash = 0;
+  /* The reel covers the canvas completely, so from here the shader is
+     drawing a full-screen frame nobody can see. Park it until we leave. */
+  gl.stop();
+  inTransit = false;
+}
+
+async function leaveArrival() {
+  if (inTransit || !currentArrival) return;
+  inTransit = true;
+
+  const back = () => {
+    const r = arrRows.find((x) => x.a.id === currentArrival.id);
+    if (r) r.stat.set(r.status, { stagger: 16 });   // it never actually arrived
+    currentArrival = null;
+  };
+
+  gl.ok && gl.start();                            // wake it before it is needed
+
+  if (REDUCED || !gl.ok) {
+    hideReel(); back();
+    station.setWorld('concourse');
+    inTransit = false;
+    return;
+  }
+
+  await tween({
+    from: 0, to: 1, dur: 900, ease: easeIn,
+    onUpdate: (v) => { gl.warp = v * 0.7; gl.fade = Math.max(0, (v - 0.7) / 0.3) * 0.85; },
+  });
+  hideReel(); back();
+  station.setWorld('concourse');
+  await tween({
+    from: 1, to: 0, dur: 1100, ease: easeOut,
+    onUpdate: (v) => { gl.warp = v * 0.4; gl.fade = v * 0.45; },
+  });
+  gl.warp = 0; gl.fade = 0;
+  inTransit = false;
+}
+
+/* ---- switching ---------------------------------------------------
+   The incoming board is blanked and allowed to flap back up, because
+   a real one cannot cut. Cell.to replaces its queue rather than
+   appending to it, so the blank pass and the fill pass have to be
+   separated in time or the second cancels the first. */
+/* The view tokens name the CONTENT, not the tab, because the two were
+   swapped: the tab labelled Departures now carries the media services
+   and the one labelled Arrivals carries the shader worlds. Naming these
+   'dep' and 'arr' after the swap would mean `boardView === 'dep'` was
+   true while an arrivals board was on screen. */
+let boardView = 'media';
+
+function showBoard(which) {
+  if (which === boardView || inTransit || quietOpen || reelOpen()) return;
+  boardView = which;
+  const isMedia = which === 'media';         // media -> #panel-dep, worlds -> #panel-arr
+  if (isMedia) buildArrivals(); else buildBoard();
+
+  const tD = $('#tab-dep'), tA = $('#tab-arr');
+  tD.classList.toggle('on', isMedia);
+  tA.classList.toggle('on', !isMedia);
+  tD.setAttribute('aria-selected', String(isMedia));
+  tA.setAttribute('aria-selected', String(!isMedia));
+  tD.tabIndex = isMedia ? 0 : -1;
+  tA.tabIndex = isMedia ? -1 : 0;
+  $('#tabs-ink').style.transform = isMedia ? 'translateX(0%)' : 'translateX(100%)';
+
+  $('#panel-dep').hidden = !isMedia;
+  $('#panel-arr').hidden = isMedia;
+  $('#board-foot-note').textContent = isMedia
+    ? 'No service on this board is expected.'
+    : 'Board refreshed continuously';
+
+  station.chime();
+
+  const target = isMedia ? arrRows : rows;
+  target.forEach((r) => {
+    r.time.set('', { from: 0 });
+    r.dest.set('', { from: 30 });
+    r.plat.set('', { from: 60 });
+    r.stat.set('', { from: 80 });
+  });
+  setTimeout(() => {
+    if (boardView !== which) return;                 // switched again mid-flap
+    /* The world board's times are offsets from now, not fixed clock values,
+       so they are re-derived on the way back in. Otherwise the column shows
+       times that have quietly gone past. Statuses carry over untouched. */
+    if (isMedia) arrRows.forEach((r) => { r.depart = new Date(Date.now() + r.a.offset * 60000); });
+    else rows.forEach((r) => { r.depart = new Date(Date.now() + r.d.offset * 60000); });
+    (isMedia ? fillArrivals : fillDepartures)(0);
+  }, REDUCED ? 0 : 430);
+}
+
+function boardWiring() {
+  $('#tab-dep').addEventListener('click', () => showBoard('media'));
+  $('#tab-arr').addEventListener('click', () => showBoard('worlds'));
+  $('.board-tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next = boardView === 'media' ? 'worlds' : 'media';
+    showBoard(next);
+    $(next === 'media' ? '#tab-dep' : '#tab-arr').focus();
+  });
+}
+
 /* the board is never quite still */
 function driftBoard() {
   setInterval(() => {
-    if (!entered || inTransit || document.hidden) return;
+    if (!entered || inTransit || document.hidden || reelOpen()) return;
     const r = rows[Math.floor(Math.random() * rows.length)];
     const next = STATUSES[Math.floor(Math.random() * STATUSES.length)];
     if (next === r.status) return;
@@ -223,11 +472,30 @@ function driftBoard() {
 
   // and the times creep forward
   setInterval(() => {
-    if (!entered || inTransit || document.hidden) return;
+    if (!entered || inTransit || document.hidden || reelOpen()) return;
     const r = rows[Math.floor(Math.random() * rows.length)];
     r.depart = new Date(r.depart.getTime() + 60000);
     r.time.set(hhmm(r.depart), { stagger: 20 });
   }, 19000);
+
+  /* The media board drifts the same way the world board does — times
+     creep forward, statuses shuffle — so both read as live clocks
+     rather than one live board and one frozen one. */
+  setInterval(() => {
+    if (!entered || inTransit || document.hidden || reelOpen()) return;
+    if (!arrBuilt || boardView !== 'media') return;
+    const r = arrRows[Math.floor(Math.random() * arrRows.length)];
+    const worse = ['DELAYED', 'HELD', 'LATE', 'NO REPORT', 'NOT KNOWN', 'CANCELLED'];
+    const next = worse[Math.floor(Math.random() * worse.length)];
+    if (next !== r.status) {
+      r.status = next;
+      r.stat.set(next, { stagger: 16 });
+    }
+    if (Math.random() < 0.4) {
+      r.depart = new Date(r.depart.getTime() + 60000);
+      r.time.set(hhmm(r.depart), { stagger: 20 });
+    }
+  }, 11000);
 }
 
 /* ================================================================
@@ -235,6 +503,7 @@ function driftBoard() {
    ================================================================ */
 async function depart_to(id) {
   if (inTransit || quietOpen || !entered || performance.now() < gateUntil) return;
+  if (boardView !== 'worlds') return;           // the other board goes nowhere
   buildBoard();
   populateBoard();
   const entry = rows.find((r) => r.d.id === id);
@@ -244,10 +513,10 @@ async function depart_to(id) {
   currentDest = d;
 
   station.enable();
+  station.stopTrain();                           // a pass in flight does not follow you
+  announcer.cancel();                            // the welcome does not follow you out
   station.chime();
-  announce(`Platform ${d.platform}. The service to ${d.name} is ready to depart.`, {
-    speak: departureLine(d),
-  });
+  announce(`Platform ${d.platform}. The service to ${d.name} is ready to depart.`);
 
   const shell = $('#board-shell');
   $$('.board-row').forEach((el) => el.classList.remove('chosen'));
@@ -737,15 +1006,7 @@ async function handItIn() {
   $('#ctr-hand').disabled = true;
 
   station.chime();
-  // letters and digits spaced, or she reads the reference as a word
-  const parts = ref.split('-');
-  await announce(ref + ' — held until morning.', {
-    speak: [
-      'Item received.',
-      'Reference ' + parts[0].split('').join(' ') + ', ' + parts[1].split('').join(' ') + '.',
-      'It will be held until morning.',
-    ],
-  });
+  await announce(ref + ' — held until morning.');
   setTimeout(() => { if (counterOpen) closeCounter(); }, 1400);
 }
 
@@ -780,53 +1041,36 @@ function lazySection(selector, run, rootMargin = '900px 0px') {
   io.observe(el);
 }
 
-/* one pointer, read by the shaders, the cursor and the hero */
-const ptr = { x: 0, y: 0, px: innerWidth / 2, py: innerHeight / 2 };
-addEventListener(
-  'pointermove',
-  (e) => {
-    ptr.px = e.clientX;
-    ptr.py = e.clientY;
-    ptr.x = (e.clientX / innerWidth) * 2 - 1;
-    ptr.y = 1 - (e.clientY / innerHeight) * 2;
-    gl.pointer(ptr.x, ptr.y);
-  },
-  { passive: true }
-);
+/* Nothing tracks the pointer as shared state any more: the hero no
+   longer tilts, uMouse stays at rest, and the cursor ring writes its
+   own transform straight from the event. */
 
 function cursor() {
   if (matchMedia('(hover: none)').matches || REDUCED) return;
   const c = $('#cursor');
-  const title = $('.hero-title');
-  const kicker = $('.hero-kicker');
-  let x = innerWidth / 2, y = innerHeight / 2, ex = 0, ey = 0;
 
-  const loop = () => {
-    requestAnimationFrame(loop);
+  /* The ring sits exactly on the pointer. It used to ease toward it at
+     0.22 per frame, which always left it trailing behind the real
+     cursor — that lag is what read as weight.
 
-    const dx = ptr.px - x, dy = ptr.py - y;
-    if (dx * dx + dy * dy > 0.02) {
-      x += dx * 0.22;
-      y += dy * 0.22;
-      c.style.transform = `translate3d(${x}px,${y}px,0)`;
-    }
+     Writing the transform straight from the pointermove event also
+     retires the rAF loop: there is nothing to animate between moves, so
+     a still mouse now costs nothing per frame. */
+  addEventListener('pointermove', (e) => {
+    c.style.transform = `translate3d(${e.clientX}px,${e.clientY}px,0)`;
+  }, { passive: true });
 
-    // the hero leans toward you — but only while the hero is on screen
-    if (scrollY < innerHeight) {
-      const ndx = ptr.x - ex, ndy = ptr.y - ey;
-      if (ndx * ndx + ndy * ndy > 1e-6) {
-        ex += ndx * 0.045;
-        ey += ndy * 0.045;
-        title.style.transform = `translate3d(${ex * 15}px, ${-ey * 9}px, 0)`;
-        kicker.style.transform = `translate3d(${ex * 30}px, ${-ey * 16}px, 0)`;
-      }
-    }
-  };
-  loop();
-
+  /* A single pass across one board row fires ~134 pointerover events,
+     because every flap cell is its own element. Resolving and writing
+     the class on all of them is pointless work — only a change of the
+     matched ancestor can change the ring, so remember the last one. */
   const hot = 'a, button, .board-row, .lf-row';
+  let lastHot;
   addEventListener('pointerover', (e) => {
-    c.classList.toggle('hot', !!(e.target.closest && e.target.closest(hot)));
+    const hit = e.target.closest ? e.target.closest(hot) : null;
+    if (hit === lastHot) return;
+    lastHot = hit;
+    c.classList.toggle('hot', !!hit);
   }, { passive: true });
 }
 
@@ -855,6 +1099,7 @@ function updateSoundBtn() {
   btn.classList.toggle('on', station.enabled);
   btn.setAttribute('aria-pressed', String(station.enabled));
   $('#sound-label').textContent = station.enabled ? 'Sound on' : 'Sound off';
+  reelAudio(station.enabled);            // a reel's bed follows the same switch
 }
 
 /* ================================================================
@@ -1057,6 +1302,10 @@ function trainWatch() {
   setInterval(() => {
     if (!entered || !gl.ok || !station.enabled) return;
     if (gl.current !== 'concourse' || document.hidden || inTransit) return;
+    /* gl.current alone is not enough: an arrival leaves the concourse
+       world loaded behind a screen, so the station would keep running
+       trains past somebody who has already left the station. */
+    if (currentDest || currentArrival || reelOpen()) return;
     if (announcer.speaking) return;        // never talk over her
     if (performance.now() < trainDue) return;
 
@@ -1076,6 +1325,7 @@ function trainWatch() {
     const startIn = untilSweep <= 6 ? untilSweep : 0;
 
     setTimeout(() => {
+      if (currentDest || currentArrival || reelOpen()) return;   // boarded while it waited
       if (gl.current === 'concourse' && !inTransit && station.enabled) {
         station.steamTrain({ dur, far: 0.5 + Math.random() * 0.22 });
       }
@@ -1094,6 +1344,7 @@ function keys() {
     // letter shortcuts must not fire while she is writing on the slip
     const typing = /^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '');
     if (e.key === 'Escape') {
+      if (reelOpen()) { leaveArrival(); return; }
       if (counterOpen) { closeCounter(); return; }
       if (quietOpen) { closeQuiet(); return; }
       if (currentDest) returnHome();
@@ -1109,11 +1360,20 @@ function keys() {
     if (e.key === 'm' || e.key === 'M') { station.toggle(); if (!station.enabled) announcer.cancel(); updateSoundBtn(); return; }
     if (e.key === 'q' || e.key === 'Q') {
       if (!gl.ok) return;
-      announce(`Rendering quality — ${gl.setQuality(gl.quality + 1)}`);
+      const q = gl.setQuality(gl.quality + 1);
+      reelRetier();               // swap the footage too, in place
+      announce(`Rendering quality — ${q}`);
       return;
     }
     if (e.key === 'n' || e.key === 'N') { toggleNight(); return; }
+    if (e.key === 'b' || e.key === 'B') { showBoard(boardView === 'media' ? 'worlds' : 'media'); return; }
     const n = parseInt(e.key, 10);
+    if (boardView === 'media') {
+      if (n >= 1 && n <= ARRIVALS.length && entered && !currentArrival) {
+        arrive_at(ARRIVALS[n - 1].id);
+      }
+      return;
+    }
     if (n >= 1 && n <= DESTINATIONS.length && entered && !currentDest) {
       depart_to(DESTINATIONS[n - 1].id);
     }
@@ -1134,7 +1394,7 @@ function init() {
      at it, because a departure board that has already finished
      flipping is just a table. */
   lazySection('#departures', buildBoard, '420px 0px');
-  lazySection('#board-shell', () => entered && populateBoard(), '-60px 0px');
+  lazySection('#board-shell', () => entered && populateVisible(), '-60px 0px');
   lazySection('#lost', lostAndFound);
 
   clock();
@@ -1196,6 +1456,30 @@ function init() {
       return `weight ${wght}`;
     },
   };
+
+  boardWiring();
+  initReel({
+    list: ARRIVALS,
+    onSelect: (id) => { leaveArrival().then(() => setTimeout(() => arrive_at(id), 160)); },
+    onBack: () => leaveArrival(),
+    isSoundOn: () => station.enabled,
+    onDuck: (v, t) => station.duck(v, t),
+    /* Deliberately NOT speak(): that routes through the tannoy rig, and
+       paOpen/paClose are the relay whoosh and carrier hiss. Over a music
+       bed they read as a broken radio rather than a voice in the room. */
+    /* No ducking here: reel.js owns it for both cue kinds, because only
+       it knows whether a music bed is up and therefore what level the
+       station should be handed back to. */
+    onSay: (line) => announcer.say(line, { gap: 640 }),
+    onCancelSpeech: () => announcer.cancel(),
+    /* HD footage on HIGH only. AUTO is the default and adapts to the
+       machine, so it stays on the light encode; a visitor who wants the
+       full-resolution clip asks for it with Q. */
+    isHd: () => gl.quality === 1,
+    audioCtx: () => station.ctx,
+    cueOpener: NIGHT_OPENER,
+    cueLines: NIGHT_LINES,
+  });
 
   if (REDUCED) {
     boot();                                  // dumps instantly, no sound to gate
