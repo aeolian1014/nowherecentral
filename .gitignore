@@ -1,5 +1,58 @@
+# ------------------------------------------------------------------
+# Nowhere Central — what does not ship
+#
+# The rule this file follows is the one CLAUDE.md already sets for the
+# asset tree: the repository holds what the site serves, and nothing
+# else. Everything below is generated, local to one machine, or a
+# master that an encode in assets/ was derived from.
+#
+# Note what is deliberately NOT ignored: dev/ is tracked on purpose.
+# Those pages are how the audio rig gets tuned, and they are worth
+# versioning even though no visitor ever loads them.
+# ------------------------------------------------------------------
+
+# ---- dependencies and build output -------------------------------
 node_modules/
+dist/
+build/
+.cache/
+
+# ---- tooling output, not the site --------------------------------
+graphify-out/
+
+# ---- logs and scratch --------------------------------------------
+*.log
+npm-debug.log*
+yarn-error.log*
+tmp/
+*.tmp
+*.bak
+*~
+
+# ---- media masters -----------------------------------------------
+# The site loads the encodes in assets/. The sources they came from
+# are hundreds of megabytes and belong in your own folders, not in a
+# repo that has to stay clonable and deployable as a unit.
+*.psd
+*.ai
+*.aep
+*.prproj
+*.wav
+*.aiff
+*.flac
+*-master.*
+
+# ---- local environment -------------------------------------------
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# ---- editors and operating systems --------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
 .DS_Store
 Thumbs.db
-*.log
-graphify-out/
+desktop.ini

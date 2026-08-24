@@ -32,8 +32,10 @@
   --surface: var(--ink-900);
   --surface-2: var(--ink-850);
   --text: var(--bone-100);
-  --text-muted: var(--bone-400);
-  --text-dim: #5d6470;
+  /* Both of these were dark enough to disappear against the plate. The
+     secondary text is a rank below the primary, not a whisper. */
+  --text-muted: #cfcabc;
+  --text-dim: #b3b8c2;
 
   --accent: var(--sodium-400);
   --accent-strong: var(--sodium-500);
@@ -54,7 +56,7 @@
   --flap-seam: rgba(0, 0, 0, 0.85);
 
   /* ---- type ------------------------------------------------------ */
-  --font-display: 'Bodoni Moda', 'Didot', Georgia, 'Times New Roman', serif;
+  --font-display: 'Playfair Display', 'Didot', Georgia, 'Times New Roman', serif;
   --font-ui: 'Space Grotesk', 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
@@ -71,14 +73,12 @@
   --tracking-wide: 0.18em;
   --tracking-wider: 0.34em;
 
-  /* Bodoni is a Didone: on `font-optical-sizing: auto` it picks the
-     display cut at large sizes, whose hairlines are the finest in the
-     family, and light-on-dark thins them again. Pinning the optical
-     size and adding a little weight keeps the thin strokes on screen
-     without flattening the contrast that makes it a Bodoni.
-     Dial both live with NC.type(opsz, wght). */
-  --display-opsz: 18;
-  --display-wght: 560;
+  /* Bodoni was a true Didone and its hairlines vanished at display
+     sizes — light-on-dark thins them again, and no amount of weight
+     fixed it without killing the contrast. Playfair keeps the same
+     high-contrast editorial voice on much sturdier thin strokes, and
+     carries a wght axis only. Dial it live with NC.type(wght). */
+  --display-wght: 500;
 
   /* ---- space (4px base) ------------------------------------------ */
   --sp-1: 4px;
