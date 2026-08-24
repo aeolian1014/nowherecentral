@@ -285,7 +285,11 @@ export const ARRIVALS = [
     status: 'NO REPORT',
     note: 'No report. You did not know it was the last one. Nobody is ever told at the time.',
     line: 'There is no report on the service from the last good year.',
-    media: { type: 'image', src: 'assets/media/heavenly-sky.webp' },
+    media: {
+      type: 'image',
+      src: 'assets/media/heavenly-sky.webp',
+      audio: 'assets/media/last-good-year.opus',
+    },
   },
   {
     id: 'whoever',
@@ -314,7 +318,11 @@ export const ARRIVALS = [
     status: 'NOT KNOWN',
     note: 'Not known. It belonged to somebody else and you only ever watched it from the platform.',
     line: 'The status of the service from another spring is not known.',
-    media: { type: 'image', src: 'assets/media/haunted-hood.webp' },
+    media: {
+      type: 'image',
+      src: 'assets/media/haunted-hood.webp',
+      audio: 'assets/media/another-spring.opus',
+    },
   },
   {
     id: 'summer',

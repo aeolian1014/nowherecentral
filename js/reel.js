@@ -56,7 +56,10 @@ function startMusic(src) {
   if (!music || music.dataset.src !== src) {
     stopMusic(true);
     music = new Audio(src);
-    music.loop = true;                   // the file is crossfaded, so this is seamless
+    /* Most beds are crossfaded at encode time, so the wrap is seamless.
+       last-good-year is the whole track, uncut, and wraps on its own
+       fade-out — the join is audible there by choice. */
+    music.loop = true;
     music.preload = 'auto';
     music.dataset.src = src;
   }

@@ -288,7 +288,7 @@ function fillArrivals(from = 0) {
     const base = from + i * 90;
     r.time.set(hhmm(r.depart), { from: base });
     r.dest.set(r.a.name, { from: base + 60 });
-    r.plat.set('—', { from: base + 120 });
+    r.plat.set(r.a.platform, { from: base + 120 });
     r.stat.set(r.status, { from: base + 150 });
   });
 }
