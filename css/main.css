@@ -2090,6 +2090,7 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
 }
 
 .tb-btn .moon { font-size: var(--fs-sm); line-height: 1; }
+.tb-btn .tb-icon { font-size: var(--fs-sm); line-height: 1; }
 .tb-btn[aria-pressed='true'] { color: var(--accent); border-color: var(--accent); background: var(--accent-ghost); }
 
 /* ------------------------------------------------------------------

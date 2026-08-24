@@ -1103,6 +1103,25 @@ function updateSoundBtn() {
   reelAudio(station.enabled);            // a reel's bed follows the same switch
 }
 
+/* Rendering quality — the touch equivalent of the Q key. The boot page
+   used to say "Press Q to step the renderer down" with no way to do it
+   on a phone; this is that control. Both the key and the button call
+   cycleQuality, and the label carries the current tier. */
+function cycleQuality() {
+  if (!gl.ok) return;
+  const q = gl.setQuality(gl.quality + 1);
+  reelRetier();                          // swap the footage tier too
+  updateQualityBtn();
+  announce(`Rendering quality — ${q}`);
+}
+function updateQualityBtn() {
+  const btn = $('#quality-btn');
+  if (!btn) return;
+  const name = gl.ok ? gl.qualityName() : '—';
+  $('#quality-label').textContent = `Quality · ${name}`;
+  btn.setAttribute('aria-label', `Rendering quality — ${name}`);
+}
+
 /* ================================================================
    Night service
 
@@ -1359,13 +1378,7 @@ function keys() {
     }
     if (typing) return;
     if (e.key === 'm' || e.key === 'M') { station.toggle(); if (!station.enabled) announcer.cancel(); updateSoundBtn(); return; }
-    if (e.key === 'q' || e.key === 'Q') {
-      if (!gl.ok) return;
-      const q = gl.setQuality(gl.quality + 1);
-      reelRetier();               // swap the footage too, in place
-      announce(`Rendering quality — ${q}`);
-      return;
-    }
+    if (e.key === 'q' || e.key === 'Q') { cycleQuality(); return; }
     if (e.key === 'n' || e.key === 'N') { toggleNight(); return; }
     if (e.key === 'b' || e.key === 'B') { showBoard(boardView === 'media' ? 'worlds' : 'media'); return; }
     const n = parseInt(e.key, 10);
@@ -1423,9 +1436,14 @@ function init() {
     addEventListener('resize', () => gl.resize(), { passive: true });
     // the boot veil is opaque — there is nothing to draw behind it
     gl.preload(['glass', 'noon', 'null', 'dunes', 'spire', 'inverted']);
+    updateQualityBtn();
+  } else {
+    // no renderer, nothing to step down — the control has no meaning
+    const qb = $('#quality-btn'); if (qb) qb.hidden = true;
   }
 
   $('#boot-cta').addEventListener('click', enterStation);
+  $('#quality-btn').addEventListener('click', cycleQuality);
   $('#arr-back').addEventListener('click', returnHome);
   $('#sound-btn').addEventListener('click', () => {
     station.toggle();
@@ -1434,8 +1452,12 @@ function init() {
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (!gl.ok) return;
-    document.hidden ? gl.stop() : gl.start();
+    if (gl.ok) document.hidden ? gl.stop() : gl.start();
+    /* Away means silent, on every device. The context carries the
+       ambience, the cues and the night drone; reel.js pauses the music
+       bed and any video on the same event. */
+    if (document.hidden) { station.suspend(); announcer.cancel(); }
+    else station.wake();
   });
 
   // signalbox: for anyone who opens the console

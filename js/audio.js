@@ -337,6 +337,24 @@ export class Station {
   }
 
   /* ------------------------------------------------------------------
+     Silence while the page is away
+
+     goBackground deliberately keeps the graph alive when the tab is
+     hidden, so night service survives a screen lock. That is the wrong
+     behaviour for the ordinary case: hide the tab and the ambience and
+     cues should stop like any other media. Suspending the context
+     halts the whole graph — including anything routed out through the
+     background MediaStream — so this silences every Web-Audio voice at
+     once. wake() only resumes if sound was actually on. */
+  suspend() {
+    if (this.ctx && this.ctx.state === 'running') this.ctx.suspend();
+  }
+
+  wake() {
+    if (this.ctx && this.enabled && this.ctx.state === 'suspended') this.ctx.resume();
+  }
+
+  /* ------------------------------------------------------------------
      Staying alive in the background
 
      A bare AudioContext is not treated as media: hide the tab for five

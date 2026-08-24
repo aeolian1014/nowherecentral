@@ -231,6 +231,11 @@ export class Renderer {
     return q.name;
   }
 
+  /** @returns {string} the current quality tier's name, for the UI. */
+  qualityName() {
+    return QUALITY[this.quality].name;
+  }
+
   /**
    * Night mode is not a quality tier — it sits on top of whichever one
    * is chosen, and restores it exactly. Six frames a second at a third
