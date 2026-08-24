@@ -1,0 +1,26 @@
+# The Dockerfile copies by hand, so this is a second line of defence —
+# it keeps the build context small, which matters here because assets/
+# is most of a gigabyte and the context is uploaded to the daemon.
+.git
+.gitignore
+.dockerignore
+Dockerfile
+compose.yaml
+docker-compose.override.yml
+
+node_modules
+graphify-out
+dist
+build
+.cache
+
+*.md
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+tmp
+*.tmp
+*.bak

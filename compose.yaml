@@ -1,0 +1,24 @@
+# ------------------------------------------------------------------
+# `docker compose up` → http://localhost:4173
+#
+# The source is bind-mounted read-only over what the image already
+# holds, so editing css/ or js/ on the host shows up on the next reload
+# with no rebuild. server.js sends `cache-control: no-store`, so a plain
+# refresh is enough — there is no cache to bust.
+#
+# Editing server.js itself is the one exception: that needs
+# `docker compose restart`, because Node has already read it.
+# ------------------------------------------------------------------
+services:
+  site:
+    build: .
+    container_name: nowhere-central
+    ports:
+      - "4173:4173"
+    volumes:
+      - ./index.html:/app/index.html:ro
+      - ./css:/app/css:ro
+      - ./js:/app/js:ro
+      - ./assets:/app/assets:ro
+      - ./server.js:/app/server.js:ro
+    restart: unless-stopped
