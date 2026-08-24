@@ -184,10 +184,23 @@ body.no-gl {
   position: fixed;
   inset: 0;
   z-index: 60;
-  display: grid;
-  place-items: center;
   background: var(--ink-1000);
+
+  /* On a phone the boot log is taller than the screen. With grid
+     place-items:center and no overflow rule the surplus rendered
+     *outside* this fixed box, straight over the page — the footnotes and
+     the hero heading bled in below, and the top line was clipped.
+
+     Flex column + `margin:auto` on the child is the safe-centre idiom:
+     centred when it fits, and when it doesn't the box scrolls its own
+     content instead of spilling it, with neither end ever cut off. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
+.veil > * { margin-block: auto; }
 
 #boot {
   z-index: 80;
@@ -2094,6 +2107,24 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   .hero-title { line-height: 0.9; }
   .topbar .right { gap: var(--sp-2); }
   #sound-label, .tb-label { display: none; }
+  /* the clock is the widest thing in the right cluster and the least
+     load-bearing — without it the two icon buttons sit inside the
+     gutter instead of spilling off the edge */
+  #clock { display: none; }
+
+  /* --- arrival detail, narrow ------------------------------------- */
+  /* The top row put the back button and the service ref on one line
+     with space-between; a real ref ("MDR · PLATFORM 1") is wider than
+     the placeholder and ran off the edge. It wraps now, and the ref
+     takes its own line under the button. */
+  .arr-top { flex-wrap: wrap; gap: var(--sp-3); }
+  #arr-ref, #reel-ref { width: 100%; }
+  #arr-name, #reel-title { font-size: var(--fs-2xl); }
+  /* mono advisory copy can carry long unbroken tokens; let them break
+     rather than push the box past the screen */
+  .arr-advisory { overflow-wrap: anywhere; }
+  /* the onward-service chips wrap instead of running off to the right */
+  .arr-nav { flex-wrap: wrap; }
   #night { width: 74px; }
   body.night .stage { padding-right: 74px; }
   body.night .topbar { padding-right: calc(var(--gutter) + 74px); }
@@ -2133,4 +2164,21 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
 @media (hover: none) {
   body, button { cursor: auto; }
   #cursor { display: none; }
+}
+
+/* ------------------------------------------------------------------
+   Touch devices: keyboard vocabulary out, touch vocabulary in
+
+   `pointer: coarse` is the finger. None of the shortcut copy means
+   anything to it — there is no Esc, no number row, no Q — so every
+   keyboard hint is hidden and the one touch equivalent is shown. The
+   `.touch-hint` is display:none everywhere else so it never doubles up
+   with the keyboard line on a desktop. */
+.touch-hint { display: none; }
+
+@media (pointer: coarse) {
+  .kbd-hint { display: none !important; }
+  .touch-hint { display: inline; }
+  /* the site now works here, so it no longer tells you to leave */
+  .boot-note { display: none; }
 }
