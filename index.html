@@ -70,24 +70,38 @@
 <!-- =========================== CONCOURSE ========================== -->
 <main class="stage" id="concourse">
 
-  <section class="hero wrap">
-    <p class="hero-kicker">Live departure board · Platforms 0 – 11</p>
-    <h1 class="hero-title">
-      <span class="ln"><span>Nowhere</span></span>
-      <span class="ln"><span><em>Central</em></span></span>
-    </h1>
-    <div class="hero-sub">
-      <p>
+  <section class="hero" id="hero">
+    <!-- three planes: image behind, type between, a slice of the same
+         image in front. the overlap is what gives the block depth. -->
+    <div class="hero-plate" aria-hidden="true">
+      <img class="hero-back" src="assets/media/vyliria.webp" alt="" decoding="async" fetchpriority="high">
+      <span class="hero-wash"></span>
+    </div>
+
+    <div class="hero-rule" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+    <div class="hero-inner wrap">
+      <p class="hero-kicker"><i>◈</i> Live departure board · Platforms 0 – 11</p>
+      <h1 class="hero-title">
+        <span class="ln"><span>Nowhere</span></span>
+        <span class="ln"><span><em>Central</em></span></span>
+      </h1>
+    </div>
+
+    <div class="hero-foot wrap">
+      <p class="hero-lede">
         Six services leave from here today. <strong>None of the destinations exist.</strong>
         The board is live, the times are real, and the trains have never once
         been late — because arrival was never part of the arrangement.
       </p>
-      <p class="hero-meta">
-        Est. — records incomplete<br>
-        Services today · <span id="svc-count">6</span><br>
-        Arrivals · 0
-      </p>
+      <dl class="hero-stats">
+        <div><dt>Services</dt><dd id="svc-count">6</dd></div>
+        <div><dt>Arrivals</dt><dd>0</dd></div>
+        <div><dt>Platforms</dt><dd>12</dd></div>
+        <div><dt>Est.</dt><dd>——</dd></div>
+      </dl>
     </div>
+
     <div class="scroll-hint">
       <span class="line"></span>
       <span>Scroll to the board</span>
@@ -147,19 +161,21 @@
 
   <hr class="rule">
 
-  <section class="sec wrap" id="station">
-    <div class="split">
-      <div class="reveal">
-        <p class="eyebrow">02 — The Station</p>
-        <h2>Built for traffic that <em>never came</em>.</h2>
-        <dl class="stats">
-          <div class="stat"><dt>Platforms</dt><dd>12<small>Zero is not counted</small></dd></div>
-          <div class="stat"><dt>Staff</dt><dd>1<small>Shift undocumented</small></dd></div>
-          <div class="stat"><dt>Departures</dt><dd>∞<small>Since records began</small></dd></div>
-          <div class="stat"><dt>Returns</dt><dd>—<small>Unrecorded</small></dd></div>
-        </dl>
-      </div>
-      <div class="prose reveal">
+  <section class="sec-x" id="station">
+    <span class="sec-num" aria-hidden="true">02</span>
+
+    <div class="sec-x-head wrap">
+      <p class="eyebrow">02 — The Station</p>
+      <h2>Built for traffic that <em>never came</em>.</h2>
+    </div>
+
+    <div class="sec-x-body wrap">
+      <figure class="sec-x-fig">
+        <img src="assets/media/haunted-hood.webp" alt="" decoding="async" loading="lazy">
+        <figcaption>Concourse, west aisle · unattributed</figcaption>
+      </figure>
+
+      <div class="sec-x-prose">
         <p>
           <span class="drop">T</span>he building predates the line it serves. Surveyors
           found the concourse already standing, already lit, already sweeping
@@ -179,27 +195,36 @@
         </p>
       </div>
     </div>
+
+    <dl class="figures wrap">
+      <div><dt>Platforms</dt><dd>12</dd><small>Zero is not counted</small></div>
+      <div><dt>Staff</dt><dd>1</dd><small>Shift undocumented</small></div>
+      <div><dt>Departures</dt><dd>&#8734;</dd><small>Since records began</small></div>
+      <div><dt>Returns</dt><dd>&#8212;</dd><small>Unrecorded</small></div>
+    </dl>
   </section>
 
   <hr class="rule">
 
-  <section class="sec wrap" id="lost">
-    <div class="split">
-      <div class="reveal">
+  <section class="sec-t" id="lost">
+    <span class="sec-num" aria-hidden="true">03</span>
+
+    <div class="sec-t-head wrap">
+      <div>
         <p class="eyebrow">03 — Lost &amp; Found</p>
         <h2>Currently held at the <em>counter</em>.</h2>
-        <p style="color:var(--text-muted); margin-top:var(--sp-4); max-width:38ch">
-          Items are kept for thirty days, or until claimed by someone else.
-          Please bring proof. Any proof.
-        </p>
+      </div>
+      <div class="sec-t-aside">
+        <p>Items are kept for thirty days, or until claimed by someone else. Please bring proof. Any proof.</p>
         <p class="lf-invite">The counter is open. Pick anything up.</p>
       </div>
-      <div class="reveal">
-        <ul class="lf-list" id="lf-list"></ul>
-        <div id="lf-held-wrap" hidden>
-          <p class="lf-heldhead">Held for you<span id="lf-held-n"></span></p>
-          <ul class="lf-list lf-held" id="lf-held"></ul>
-        </div>
+    </div>
+
+    <div class="wrap">
+      <ul class="lf-list" id="lf-list"></ul>
+      <div id="lf-held-wrap" hidden>
+        <p class="lf-heldhead">Held for you<span id="lf-held-n"></span></p>
+        <ul class="lf-list lf-held" id="lf-held"></ul>
       </div>
     </div>
   </section>

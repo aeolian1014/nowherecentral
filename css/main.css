@@ -30,23 +30,26 @@ body.no-custom-cursor { cursor: auto; }
 
 h1, h2, h3, p, figure, ul, ol { margin: 0; }
 ul, ol { padding: 0; list-style: none; }
-a { color: inherit; text-decoration: none; }
+/* cursor:none has to be declared here, not left to inherit from body:
+   the UA sheet sets `cursor: pointer` directly on any link, and a
+   direct declaration beats an inherited one, so the OS hand was drawn
+   on top of the custom cursor on every link. */
+a { color: inherit; text-decoration: none; cursor: none; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: none; }
 
 ::selection { background: var(--accent); color: var(--ink-1000); }
 
-/* Every use of the display serif shares one optical-size and weight
-   pair. No shadow and no stroke — just the axes the family provides. */
+/* Every use of the display serif shares one weight. Playfair carries a
+   wght axis only, so that is the single dial. No shadow, no stroke. */
 .hero-title,
-.sec h2,
 .board-head h2,
+.sec-x-head h2,
+.sec-t-head h2,
+.sec-x-prose .drop,
 #arr-name,
 #arr-strap,
-.stat dd,
-.prose .drop,
 #nightclock .nc-time {
-  font-optical-sizing: none;
-  font-variation-settings: 'opsz' var(--display-opsz), 'wght' var(--display-wght);
+  font-variation-settings: 'wght' var(--display-wght);
 }
 
 :focus-visible {
@@ -130,7 +133,8 @@ body.no-gl {
    deliberately excluded — it is on screen at load, and containing it
    would only add work. */
 .board-section,
-.sec {
+.sec-x,
+.sec-t {
   content-visibility: auto;
   contain-intrinsic-size: auto 900px;
 }
@@ -308,6 +312,16 @@ body.no-gl {
    3. Top bar
 ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------
+   Top bar
+
+   Was a row of bordered pills — the boxed-button look that dates a
+   header faster than anything else in it. Now the chrome is gone and
+   the structure does the work instead: a three-column grid so the nav
+   is optically centred rather than pushed there by flex, hairline
+   dividers between zones, and state carried by a marker and a colour
+   rather than by a box around the label.
+------------------------------------------------------------------ */
 .topbar {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -315,7 +329,7 @@ body.no-gl {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-5);
+  gap: var(--sp-6);
   padding: var(--sp-4) var(--gutter);
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
@@ -324,45 +338,115 @@ body.no-gl {
   color: var(--text-muted);
   /* a gradient, not a backdrop-filter: blurring a live canvas every
      frame is one of the most expensive things a page can ask for */
-  background: linear-gradient(180deg, rgba(5, 7, 10, 0.94) 0%, rgba(5, 7, 10, 0.82) 55%, rgba(5, 7, 10, 0) 100%);
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--d-med) var(--ease-std), opacity var(--d-slow) var(--ease-std);
+  background: linear-gradient(180deg, rgba(5,7,10,0.92) 0%, rgba(5,7,10,0.62) 62%, rgba(5,7,10,0) 100%);
+  transition: opacity var(--d-slow) var(--ease-std),
+              background var(--d-med) var(--ease-std);
 }
-.topbar.stuck { border-bottom-color: var(--border); }
+/* Over the hero a feathered scrim is right — there is nothing behind it
+   but picture. Over the sections there is body copy, and a half-there
+   gradient let the prose read straight through the nav. Once the page
+   has scrolled, the bar stops being a veil and becomes a surface. */
+.topbar.stuck {
+  background: linear-gradient(180deg, rgba(5,7,10,0.98) 0%, rgba(5,7,10,0.96) 70%, rgba(5,7,10,0.9) 100%);
+}
+/* the hairline arrives on scroll instead of a permanent border */
+.topbar::after {
+  content: '';
+  position: absolute; left: var(--gutter); right: var(--gutter); bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-strong) 18%, var(--border-strong) 82%, transparent);
+  opacity: 0;
+  transition: opacity var(--d-med) var(--ease-std);
+}
+.topbar.stuck::after { opacity: 1; }
 
 .topbar .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--sp-3);
   color: var(--text);
+  letter-spacing: var(--tracking-wider);
 }
 .topbar .brand .glyph {
   font-size: var(--fs-sm);
   color: var(--accent);
   letter-spacing: 0;
+  /* a slow turn, so the mark is alive without asking to be watched */
+  animation: brandturn 24s linear infinite;
 }
+@keyframes brandturn { to { transform: rotate(360deg); } }
 
-.topbar .center { display: flex; gap: var(--sp-5); }
-.topbar .right { display: flex; align-items: center; gap: var(--sp-4); }
+/* --- nav: the underline is the only decoration ------------------- */
+/* Absolutely centred, not grid-centred. `1fr auto 1fr` looks like it
+   centres, but 1fr is minmax(auto, 1fr) — the wider side zone forces its
+   column out and drags the nav off axis by however much the two sides
+   differ. Taking it out of flow makes it exact regardless. */
+.topbar .center {
+  display: flex;
+  gap: var(--sp-6);
+  position: absolute;
+  /* Centred on the topbar, not the viewport. `left: 50%` measures against
+     the viewport including the scrollbar, which throws the nav off by
+     half the scrollbar's width — 8px here, and visible once you know. */
+  left: 0; right: 0;
+  justify-content: center;
+  pointer-events: none;
+}
+.topbar .center a { pointer-events: auto; }
+.topbar .center a {
+  position: relative;
+  padding-block: 2px;
+  color: var(--text-muted);
+  transition: color var(--d-fast) var(--ease-std);
+}
+.topbar .center a::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: -2px;
+  height: 1px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform var(--d-med) var(--ease-out);
+}
+.topbar .center a:hover { color: var(--text); }
+.topbar .center a:hover::after { transform: scaleX(1); transform-origin: left; }
+
+/* --- right zone: divided, not boxed ------------------------------ */
+/* The dividers used to be padding-left on each item, which left every
+   item padded on one side only — so the hover and focus shapes were
+   lopsided, and the last one ran flush into the gutter with nothing on
+   its right. Each item now carries its own symmetric padding and the
+   row is pulled back by that same amount, so the boxes breathe evenly
+   while the text still lines up with the gutter. */
+.topbar .right {
+  display: flex;
+  align-items: center;
+  margin-right: calc(var(--sp-3) * -1);
+}
+.topbar .right > * {
+  padding: 4px var(--sp-3);
+}
+.topbar .right > * + * { border-left: 1px solid var(--border); }
 
 #clock {
   font-variant-numeric: tabular-nums;
   color: var(--text);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.10em;
 }
-#clock .ms { color: var(--accent); }
+#clock .ms { color: var(--accent); opacity: 0.75; }
 
+/* State reads from a marker and a colour. No border, no fill, no pill. */
 .tb-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
   letter-spacing: var(--tracking-wide);
-  transition: color var(--d-fast), border-color var(--d-fast), background-color var(--d-fast);
+  color: var(--text-dim);
+  transition: color var(--d-fast) var(--ease-std);
 }
-.tb-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-ghost); }
+.tb-btn:hover { color: var(--text); }
+.tb-btn.on { color: var(--accent); }
+
 .tb-btn .bars { display: flex; align-items: flex-end; gap: 2px; height: 9px; }
 .tb-btn .bars i { width: 2px; background: currentColor; height: 30%; transition: height 180ms var(--ease-std); }
 .tb-btn.on .bars i { animation: eq 900ms var(--ease-std) infinite alternate; }
@@ -370,21 +454,79 @@ body.no-gl {
 .tb-btn.on .bars i:nth-child(3) { animation-delay: 280ms; }
 @keyframes eq { from { height: 25%; } to { height: 100%; } }
 
-@media (max-width: 900px) { .topbar .center { display: none; } }
+.tb-btn .moon { transition: transform var(--d-med) var(--ease-out); }
+.tb-btn.on .moon { transform: rotate(-18deg); }
+
+/* The nav is out of flow, so nothing stops it running under the clock.
+   Brand + links + right zone need ~1150px to coexist; below that the
+   links go rather than collide. */
+@media (max-width: 1150px) {
+  .topbar .center { display: none; }
+}
 
 /* ------------------------------------------------------------------
    4. Hero
 ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------
+   Hero — picture behind, type in front
+
+   There used to be a third plane: a masked slice of the same image
+   laid over the word, so the type sat inside the picture. It read as
+   the title fading out halfway down, which is not a look worth the
+   letterforms it eats. The word is solid now; depth is the grade and
+   the wash, not something covering the type.
+------------------------------------------------------------------ */
 .hero {
+  position: relative;
+  isolation: isolate;
   min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-block: var(--sp-10) var(--sp-8);
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  align-content: center;
+  overflow: hidden;
+  padding-block: var(--sp-9) var(--sp-6);
 }
 
+/* --- plane 1: the picture ---------------------------------------- */
+.hero-plate { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.hero-back {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: 68% 42%;
+  /* graded light: the picture is the composition here, not a texture.
+     It used to be crushed to a ground and there was nothing left to
+     look at. */
+  filter: contrast(1.05) brightness(0.94) saturate(1.02);
+  transform: scale(1.04);
+}
+/* The wash is now only a seat for the type — enough to stop the copy
+   floating loose on a busy frame, nowhere near enough to hide it. Text
+   legibility is carried by the text's own colour, not by drowning the
+   picture; if something reads badly, brighten the type, not this. */
+.hero-wash {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(100deg, rgba(5,7,10,0.62) 0%, rgba(5,7,10,0.30) 34%,
+                    rgba(5,7,10,0) 62%, rgba(5,7,10,0.16) 100%),
+    linear-gradient(180deg, rgba(5,7,10,0.44) 0%, transparent 22%,
+                    transparent 52%, rgba(5,7,10,0.26) 78%,
+                    rgba(5,7,10,0.52) 94%, rgba(5,7,10,0.62) 100%);
+}
+
+/* --- the measured rule: four hairlines, editorial scaffolding ----- */
+.hero-rule {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+}
+.hero-rule i { border-left: 1px solid rgba(255,255,255,0.035); }
+.hero-rule i:first-child { border-left: 0; }
+
+/* --- plane 2: the type ------------------------------------------- */
+.hero-inner { position: relative; z-index: 2; align-self: center; }
+
 .hero-kicker {
+  display: flex; align-items: center; gap: var(--sp-3);
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   letter-spacing: var(--tracking-wider);
@@ -392,62 +534,89 @@ body.no-gl {
   color: var(--accent);
   margin-bottom: var(--sp-5);
 }
+.hero-kicker i { font-style: normal; opacity: 0.8; }
 
 .hero-title {
   font-family: var(--font-display);
-  --display-opsz: 58;
-  /* A Didone's hairline is the first thing to go on a dark ground.
-     High opsz = the display cut = maximum thick/thin drama and the
-     finest hairline; weight is what puts thickness back without
-     flattening the contrast. This pair is the dial — try values with
-     NC.type(opsz, wght) in the console and keep the ones you like. */
-  --display-wght: 470;
-  font-size: var(--fs-mega);
-  line-height: 0.84;
-  letter-spacing: -0.02em;
-  margin-bottom: var(--sp-6);
+  --display-wght: 520;
+  font-size: clamp(3rem, 10.5vw, 9.5rem);
+  line-height: 0.86;
+  letter-spacing: -0.045em;    /* display type wants far tighter tracking */
+  margin: 0;
 }
 .hero-title .ln { display: block; overflow: hidden; }
 .hero-title .ln > span {
   display: block;
   transform: translateY(105%);
-  transition: transform 1100ms var(--ease-out);
+  transition: transform 1200ms var(--ease-out);
 }
-.hero-title .ln:nth-child(2) > span { transition-delay: 90ms; }
+.hero-title .ln:nth-child(2) > span { transition-delay: 110ms; }
 .ready .hero-title .ln > span { transform: none; }
-/* the italic is cut finer still, so it gets a little more weight again */
 .hero-title em {
   font-style: italic;
   color: var(--accent);
-  --display-wght: 500;
+  --display-wght: 540;
+  margin-left: 0.06em;
 }
 
-.hero-sub {
+/* The lower band. Bounded to the hero so its gradient stops mean
+   something, and stacked above the picture but below the copy. */
+.hero::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 40%;
+  z-index: 1;                  /* under the type: it seats the foot, it
+                                  does not wash over the word */
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    transparent 0%, rgba(5,7,10,0.16) 40%, rgba(5,7,10,0.42) 70%, rgba(5,7,10,0.62) 92%);
+}
+
+/* --- the foot: lede left, figures right -------------------------- */
+.hero-foot {
+  position: relative; z-index: 4;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: var(--sp-6);
+  gap: var(--sp-7);
   border-top: 1px solid var(--border);
   padding-top: var(--sp-4);
+  margin-top: var(--sp-7);
 }
-.hero-sub p {
-  max-width: 46ch;
+.hero-lede {
+  max-width: 44ch;
   color: var(--text-muted);
   font-size: var(--fs-base);
 }
-.hero-sub p strong { color: var(--text); font-weight: 500; }
-.hero-meta {
+.hero-lede strong { color: var(--text); font-weight: 500; }
+
+.hero-stats { display: flex; gap: var(--sp-7); margin: 0; }
+.hero-stats div { text-align: right; }
+.hero-stats dt {
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
-  letter-spacing: var(--tracking-wide);
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
   color: var(--text-dim);
-  text-align: right;
-  white-space: nowrap;
+  margin-bottom: var(--sp-1);
 }
-@media (max-width: 720px) {
-  .hero-sub { grid-template-columns: 1fr; }
-  .hero-meta { text-align: left; }
+.hero-stats dd {
+  margin: 0;
+  font-family: var(--font-display);
+  --display-wght: 500;
+  font-size: var(--fs-2xl);
+  line-height: 1;
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .hero-rule { grid-template-columns: repeat(2, 1fr); }
+  .hero-foot { grid-template-columns: 1fr; }
+  .hero-stats { justify-content: space-between; gap: var(--sp-4); }
+  .hero-stats div { text-align: left; }
+}
+
 }
 
 .scroll-hint {
@@ -486,7 +655,6 @@ body.no-gl {
 }
 .board-head h2 {
   font-family: var(--font-display);
-  --display-opsz: 24;
   --display-wght: 500;
   font-size: var(--fs-2xl);
   line-height: 1;
@@ -902,7 +1070,175 @@ body.no-gl {
    6. Editorial sections
 ------------------------------------------------------------------ */
 
-.sec { padding-block: var(--sp-9); position: relative; }
+/* ------------------------------------------------------------------
+   Sections below the board
+
+   Both used to be the same two-column .split — same shape, same
+   rhythm, twice. Reading them back to back felt like one section
+   printed twice.
+
+   They now differ on purpose. 02 is pictorial: full-bleed image, an
+   oversized numeral bled off the edge, prose set narrow and offset.
+   03 is purely typographic — no image at all — so the page alternates
+   instead of repeating. The contrast between them is the rhythm.
+------------------------------------------------------------------ */
+.sec-x, .sec-t {
+  position: relative;
+  padding-block: var(--sp-10) var(--sp-9);
+  overflow: hidden;
+}
+
+/* the numeral is scenery, not a label: huge, dim, half off the page */
+.sec-num {
+  position: absolute;
+  top: var(--sp-6);
+  right: -0.08em;
+  font-family: var(--font-display);
+  --display-wght: 400;
+  font-size: clamp(9rem, 26vw, 26rem);
+  line-height: 0.72;
+  letter-spacing: -0.06em;
+  color: var(--text);
+  opacity: 0.035;
+  pointer-events: none;
+  user-select: none;
+}
+
+.sec-x-head, .sec-t-head { position: relative; z-index: 1; }
+.sec-x-head { margin-bottom: var(--sp-8); }
+
+/* The section heading is the display serif at reading-poster size. The
+   measure is capped on the h2 itself, not on the head — capping the
+   head collapses the whole block to a narrow centred column, because
+   it is also a .wrap and inherits its auto margins. */
+.sec-x-head h2, .sec-t-head h2 {
+  font-family: var(--font-display);
+  --display-wght: 500;
+  font-size: var(--fs-3xl);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  max-width: 17ch;
+  margin-top: var(--sp-4);
+  color: var(--text);
+}
+.sec-x-head h2 em,
+.sec-t-head h2 em { font-style: italic; color: var(--accent); --display-wght: 520; }
+
+/* --- 02: picture left, prose offset right ------------------------ */
+.sec-x-body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  align-items: end;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-9);
+}
+/* the figure bleeds off the left edge — a full-width container inside a
+   wrapped page is what stops the section reading as a document column */
+.sec-x-fig {
+  position: relative;
+  margin: 0 0 0 calc(var(--gutter) * -1);
+}
+.sec-x-fig img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  filter: grayscale(0.4) contrast(1.1) brightness(0.72);
+}
+/* a hairline frame, offset — the detail that reads as considered */
+.sec-x-fig::after {
+  content: '';
+  position: absolute;
+  inset: var(--sp-4) calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) var(--sp-4);
+  border: 1px solid var(--border);
+  pointer-events: none;
+}
+.sec-x-fig figcaption {
+  /* the picture bleeds out through the gutter, the caption does not —
+     it belongs to the page column, not to the edge of the screen */
+  padding-left: var(--gutter);
+  margin-top: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+/* The grid column is the measure. A 46ch cap plus a gutter of padding
+   left the copy stopping ~230px short of the page edge, which read as
+   a hole in the layout rather than as a margin. */
+.sec-x-prose { max-width: none; }
+.sec-x-prose p {
+  color: var(--text-muted);
+  font-size: var(--fs-lg);
+  line-height: 1.72;
+}
+.sec-x-prose p + p { margin-top: var(--sp-5); }
+.sec-x-prose em { font-style: italic; color: var(--text); }
+/* the drop cap: display serif, three lines deep, optically kerned in */
+.sec-x-prose .drop {
+  float: left;
+  font-family: var(--font-display);
+  --display-wght: 500;
+  font-size: 3.6em;
+  line-height: 0.78;
+  padding: 0.06em 0.12em 0 0;
+  color: var(--text);
+}
+
+/* --- the figures: a band of display numerals, not a definition list */
+.figures {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-6);
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-5);
+  /* margin-block only: this is also a .wrap, and a blanket `margin: 0`
+     kills the auto inline margins that centre the page column. */
+  margin-block: 0;
+}
+.figures div { display: flex; flex-direction: column; gap: var(--sp-2); }
+.figures dt {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.figures dd {
+  margin: 0;
+  font-family: var(--font-display);
+  --display-wght: 440;
+  font-size: clamp(2.6rem, 6vw, 4.6rem);
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+.figures small { color: var(--text-dim); font-size: var(--fs-2xs); }
+
+/* --- 03: typographic, head split against an aside ---------------- */
+.sec-t-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  align-items: end;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-7);
+}
+.sec-t-aside p { color: var(--text-muted); max-width: 38ch; }
+.sec-t-aside .lf-invite { margin-top: var(--sp-4); }
+
+@media (max-width: 900px) {
+  .sec-x-body, .sec-t-head { grid-template-columns: 1fr; }
+  .sec-x-fig { margin-left: calc(var(--gutter) * -1); margin-right: calc(var(--gutter) * -1); }
+  .sec-x-fig::after { display: none; }
+  .sec-x-fig figcaption { padding-left: var(--gutter); }
+  .figures { grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); }
+  .sec-num { font-size: clamp(7rem, 34vw, 14rem); opacity: 0.045; }
+}
 
 .reveal {
   opacity: 0;
@@ -910,41 +1246,6 @@ body.no-gl {
   transition: opacity 900ms var(--ease-out), transform 900ms var(--ease-out);
 }
 .reveal.in { opacity: 1; transform: none; }
-
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: var(--sp-8) var(--sp-9);
-  align-items: start;
-}
-@media (max-width: 900px) { .split { grid-template-columns: 1fr; gap: var(--sp-6); } }
-
-.sec h2 {
-  font-family: var(--font-display);
-  --display-opsz: 24;
-  --display-wght: 500;
-  font-size: var(--fs-2xl);
-  line-height: 1.02;
-  letter-spacing: -0.015em;
-  margin-top: var(--sp-4);
-}
-.sec h2 em { font-style: italic; color: var(--accent); --display-wght: 520; }
-
-.prose p {
-  color: var(--bone-300);
-  max-width: var(--measure);
-  font-size: var(--fs-lg);
-  line-height: 1.72;
-}
-.prose p + p { margin-top: var(--sp-5); }
-.prose p .drop {
-  float: left;
-  font-family: var(--font-display);
-  font-size: 3.6em;
-  line-height: 0.78;
-  padding: 0.06em 0.12em 0 0;
-  color: var(--text);
-}
 
 /* lost & found */
 .lf-list { border-top: 1px solid var(--border); }
@@ -971,35 +1272,6 @@ body.no-gl {
   .lf-row { grid-template-columns: 1fr; gap: var(--sp-1); }
   .lf-row .arrow { display: none; }
 }
-
-/* stat strip */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  margin-top: var(--sp-7);
-}
-.stat { background: rgba(8, 11, 16, 0.7); padding: var(--sp-5); }
-.stat dt {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: var(--sp-2);
-}
-.stat dd {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-xl);
-  line-height: 1;
-  color: var(--text);
-}
-.stat dd small { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--text-muted); display: block; margin-top: 6px; letter-spacing: 0.1em; }
 
 /* footer */
 .site-foot {
@@ -1115,7 +1387,6 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 }
 #arr-name {
   font-family: var(--font-display);
-  --display-opsz: 16;
   --display-wght: 500;
   font-size: var(--fs-3xl);
   line-height: 0.92;
@@ -1126,7 +1397,6 @@ body.away .topbar { opacity: 0; pointer-events: none; }
 #arr-strap {
   font-family: var(--font-display);
   font-style: italic;
-  --display-opsz: 22;
   --display-wght: 500;
   font-size: var(--fs-xl);
   color: var(--accent);
@@ -1330,7 +1600,6 @@ body.q-still .q-chrome { opacity: 0; pointer-events: none; }
 .q-text { max-width: 46ch; }
 .q-text h2 {
   font-family: var(--font-display);
-  --display-opsz: 26;
   --display-wght: 480;
   font-size: var(--fs-xl);
   line-height: 1.15;
@@ -1489,7 +1758,6 @@ body.q-still .q-chrome { opacity: 0; pointer-events: none; }
 .ctr-prompt {
   margin-top: var(--sp-6);
   font-family: var(--font-display);
-  --display-opsz: 24;
   --display-wght: 500;
   font-size: var(--fs-xl);
   line-height: 1.15;
@@ -1834,7 +2102,6 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   .vol-wrap { height: 108px; }
   #vol { width: 108px; }
   #nightclock { inset: auto auto var(--sp-8) var(--sp-4); }
-  .stat { padding: var(--sp-4); }
   .arr-inner { padding-top: var(--sp-7); }
   .arr-foot { flex-direction: column; align-items: flex-start; }
   #arr-strap { max-width: none; }
