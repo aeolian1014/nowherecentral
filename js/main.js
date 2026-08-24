@@ -129,6 +129,7 @@ function enterStation() {
   station.enable();
   station.setWorld('concourse');
   updateSoundBtn();
+  document.documentElement.classList.remove('boot-lock');
   $('#boot').classList.add('gone');
   $('#boot').inert = true;
   $('#concourse').inert = false;
@@ -1383,6 +1384,13 @@ function keys() {
 function init() {
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   scrollTo(0, 0);
+  /* The terminal is a fixed veil, but a fixed veil does not stop the
+     document behind it from scrolling — and on a phone that scroll
+     collapses the address bar, grows the visual viewport, and slides
+     the page up past the veil so the board shows underneath. Locking
+     the document while the veil is up is the only thing that holds on
+     every mobile browser; enterStation lifts it. */
+  document.documentElement.classList.add('boot-lock');
   $('#arrival').inert = true;
   $('#counter').inert = true;
   $('#quiet').inert = true;

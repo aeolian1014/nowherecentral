@@ -202,6 +202,17 @@ body.no-gl {
 }
 .veil > * { margin-block: auto; }
 
+/* While the terminal veil is up the document does not move. This stops
+   the page scrolling out from behind the fixed veil on mobile, where a
+   scroll would otherwise collapse the address bar and reveal the board.
+   The veil itself still scrolls its own content on a short screen. */
+html.boot-lock,
+html.boot-lock body {
+  overflow: hidden;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
 #boot {
   z-index: 80;
   transition: opacity 900ms var(--ease-std), visibility 900ms;
