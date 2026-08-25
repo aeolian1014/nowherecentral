@@ -465,6 +465,10 @@ html.boot-lock body {
 }
 /* shown once through the gate; the boot veil (z-80) covers it before */
 body.ready #controls { opacity: 1; pointer-events: auto; }
+/* night service owns the right edge — its rail carries its own volume
+   and close, so the corner cluster stands down and stops colliding
+   with the rail's top */
+body.night #controls { opacity: 0; pointer-events: none; }
 
 #clock {
   font-family: var(--font-mono);
@@ -820,25 +824,24 @@ body.ready #controls { opacity: 1; pointer-events: auto; }
 .reel-line    { color: var(--accent) !important; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: var(--tracking-wide); }
 
 /* ------------------------------------------------------------------
-   The service pages step back
+   The service pages step back — but not to nothing
 
-   These are the immersive surfaces — a moving world or a still frame
-   with a music bed. The point is the picture and the sound, not the
-   copy, so everything a visitor would only read is dropped: the codes,
-   the descriptions, the advisories, the ref, the section labels. What
-   stays is the destination name, the way back, the onward chips, and
-   the floating controls. Reversible: none of the text is deleted, only
-   hidden, so the authored voice survives in the markup.
+   These are the immersive surfaces: a moving world or a still frame
+   with a music bed, meant to be looked at and listened to. The wall of
+   copy is gone — the paragraph of prose, the timetable advisory, the
+   conditions panel, the ref in the corner, the section labels. What
+   stays is a composed trio: a small code eyebrow, the destination
+   name, and one atmospheric line — enough to sit as a designed block
+   rather than a lone word floating in an empty frame. Reversible: the
+   rest is hidden, not deleted, so the authored voice survives.
 ------------------------------------------------------------------ */
-#reel-code, #reel-note, #reel-line, #reel-ref,
-#arr-code, #arr-strap, #arr-prose, .arr-panel, #arr-ref,
+#reel-line, #reel-ref,
+#arr-prose, .arr-panel, #arr-advisory, #arr-ref,
 .reel .arr-foot > span:not(.kbd-hint):first-child,
 #arrival .arr-foot > span:not(.kbd-hint):first-child {
   display: none;
 }
-/* with the description gone the name is the whole composition */
-.reel-body, .arr-stagger { max-width: 60ch; }
-.reel-body h2, #arr-name { margin-bottom: 0; }
+.reel-body, .arr-stagger { max-width: 34ch; }
 /* the back control loses its word — the arrow is enough over a picture */
 .arr-back span:last-child { display: none; }
 .arr-back { padding: 8px 12px; }
