@@ -55,22 +55,39 @@
     <a href="#station">The Station</a>
     <a href="#lost">Lost &amp; Found</a>
   </nav>
-  <div class="right">
-    <span id="clock">--:--<span class="ms">:--</span></span>
-    <button class="tb-btn" id="quality-btn" type="button" aria-label="Rendering quality">
-      <span class="tb-icon" aria-hidden="true">▤</span>
-      <span class="tb-label" id="quality-label">Quality</span>
-    </button>
-    <button class="tb-btn" id="night-btn" type="button" aria-pressed="false" aria-label="Night service">
-      <span class="moon">☾</span>
-      <span class="tb-label">Night service</span>
-    </button>
-    <button class="tb-btn" id="sound-btn" type="button" aria-pressed="false" aria-label="Toggle station sound">
-      <span class="bars"><i></i><i></i><i></i></span>
-      <span id="sound-label">Sound off</span>
-    </button>
-  </div>
 </header>
+
+<!-- ===================== FLOATING CONTROLS ======================== -->
+<!-- Lifted out of the top bar so they ride above every surface — the
+     home board and the immersive service pages alike — and reduced to
+     bare glyphs: nobody reads a control they can recognise. The clock
+     rides with them on wide screens and steps aside on a phone. -->
+<aside id="controls" aria-label="Playback and display">
+  <span id="clock">--:--<span class="ms">:--</span></span>
+  <button class="ctl" id="sound-btn" type="button" aria-pressed="false" aria-label="Sound">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 9v6h4l5 4V5L8 9H4z"/>
+      <path class="wave" d="M16.5 8.5a5 5 0 010 7" fill="none"/>
+      <path class="wave" d="M19 6a9 9 0 010 12" fill="none"/>
+      <line class="slash" x1="3.5" y1="3.5" x2="20.5" y2="20.5"/>
+    </svg>
+    <span class="sr-only" id="sound-label">Sound off</span>
+  </button>
+  <button class="ctl" id="night-btn" type="button" aria-pressed="false" aria-label="Night service">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.5 15A8.5 8.5 0 019 3.5 8.5 8.5 0 1020.5 15z"/>
+    </svg>
+    <span class="sr-only">Night service</span>
+  </button>
+  <button class="ctl" id="quality-btn" type="button" aria-label="Rendering quality">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="14" width="3.4" height="6" rx="1"/>
+      <rect x="10.3" y="9" width="3.4" height="11" rx="1"/>
+      <rect x="16.6" y="4" width="3.4" height="16" rx="1"/>
+    </svg>
+    <span class="sr-only" id="quality-label">Quality</span>
+  </button>
+</aside>
 
 <!-- =========================== CONCOURSE ========================== -->
 <main class="stage" id="concourse">

@@ -442,47 +442,82 @@ html.boot-lock body {
    its right. Each item now carries its own symmetric padding and the
    row is pulled back by that same amount, so the boxes breathe evenly
    while the text still lines up with the gutter. */
-.topbar .right {
+/* ------------------------------------------------------------------
+   Floating controls
+
+   Three recognisable glyphs and a clock, riding above every surface in
+   the top-right — the home board and the immersive service pages
+   alike, so the audio is reachable without going back. No words: a
+   speaker, a moon and a set of bars carry their own meaning, and the
+   page is meant to be listened to, not read. They sit on a faint
+   blurred tile only so they survive over a bright frame. */
+#controls {
+  position: fixed;
+  top: 0; right: 0;
+  z-index: 60;
   display: flex;
   align-items: center;
-  margin-right: calc(var(--sp-3) * -1);
+  gap: 2px;
+  padding: var(--sp-3) var(--gutter);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-slow) var(--ease-std);
 }
-.topbar .right > * {
-  padding: 4px var(--sp-3);
-}
-.topbar .right > * + * { border-left: 1px solid var(--border); }
+/* shown once through the gate; the boot veil (z-80) covers it before */
+body.ready #controls { opacity: 1; pointer-events: auto; }
 
 #clock {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.16em;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
-  letter-spacing: 0.10em;
+  color: var(--text-muted);
+  padding-right: var(--sp-3);
+  margin-right: var(--sp-2);
+  border-right: 1px solid var(--border);
 }
 #clock .ms { color: var(--accent); opacity: 0.75; }
 
-/* State reads from a marker and a colour. No border, no fill, no pill. */
-.tb-btn {
+.ctl {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
-  letter-spacing: var(--tracking-wide);
-  color: var(--text-dim);
-  transition: color var(--d-fast) var(--ease-std);
+  justify-content: center;
+  width: 38px; height: 38px;
+  border-radius: var(--r-full);
+  color: var(--text-muted);
+  transition: color var(--d-fast) var(--ease-std),
+              background var(--d-fast) var(--ease-std);
 }
-.tb-btn:hover { color: var(--text); }
-.tb-btn.on { color: var(--accent); }
+.ctl svg { width: 20px; height: 20px; display: block; }
+.ctl svg [fill='none'] { stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.ctl svg :not([fill='none']) { fill: currentColor; }
+.ctl:hover { color: var(--text); background: rgba(242, 239, 230, 0.06); }
 
-.tb-btn .bars { display: flex; align-items: flex-end; gap: 2px; height: 9px; }
-.tb-btn .bars i { width: 2px; background: currentColor; height: 30%; transition: height 180ms var(--ease-std); }
-.tb-btn.on .bars i { animation: eq 900ms var(--ease-std) infinite alternate; }
-.tb-btn.on .bars i:nth-child(2) { animation-delay: 140ms; }
-.tb-btn.on .bars i:nth-child(3) { animation-delay: 280ms; }
-@keyframes eq { from { height: 25%; } to { height: 100%; } }
+/* sound: waves when on, a slash when off */
+.ctl .slash { stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+#sound-btn .wave { opacity: 0; transition: opacity var(--d-fast) var(--ease-std); }
+#sound-btn .slash { opacity: 1; }
+#sound-btn.on { color: var(--accent); }
+#sound-btn.on .wave { opacity: 1; }
+#sound-btn.on .slash { opacity: 0; }
 
-.tb-btn .moon { transition: transform var(--d-med) var(--ease-out); }
-.tb-btn.on .moon { transform: rotate(-18deg); }
+/* night + quality: accent when engaged */
+#night-btn { transition: transform var(--d-med) var(--ease-out), color var(--d-fast) var(--ease-std); }
+#night-btn[aria-pressed='true'] { color: var(--accent); }
+#quality-btn:active { transform: scale(0.92); }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* The nav is out of flow, so nothing stops it running under the clock.
-   Brand + links + right zone need ~1150px to coexist; below that the
+   Brand + links + controls need ~1150px to coexist; below that the
    links go rather than collide. */
 @media (max-width: 1150px) {
   .topbar .center { display: none; }
@@ -783,6 +818,30 @@ html.boot-lock body {
 .reel-body h2 { margin: 0 0 var(--sp-3); font-size: clamp(1.8rem, 5vw, 3.4rem); }
 .reel-body p  { margin: 0 0 var(--sp-3); color: var(--text-dim); }
 .reel-line    { color: var(--accent) !important; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: var(--tracking-wide); }
+
+/* ------------------------------------------------------------------
+   The service pages step back
+
+   These are the immersive surfaces — a moving world or a still frame
+   with a music bed. The point is the picture and the sound, not the
+   copy, so everything a visitor would only read is dropped: the codes,
+   the descriptions, the advisories, the ref, the section labels. What
+   stays is the destination name, the way back, the onward chips, and
+   the floating controls. Reversible: none of the text is deleted, only
+   hidden, so the authored voice survives in the markup.
+------------------------------------------------------------------ */
+#reel-code, #reel-note, #reel-line, #reel-ref,
+#arr-code, #arr-strap, #arr-prose, .arr-panel, #arr-ref,
+.reel .arr-foot > span:not(.kbd-hint):first-child,
+#arrival .arr-foot > span:not(.kbd-hint):first-child {
+  display: none;
+}
+/* with the description gone the name is the whole composition */
+.reel-body, .arr-stagger { max-width: 60ch; }
+.reel-body h2, #arr-name { margin-bottom: 0; }
+/* the back control loses its word — the arrow is enough over a picture */
+.arr-back span:last-child { display: none; }
+.arr-back { padding: 8px 12px; }
 
 /* Full bleed. An earlier version locked this to the largest 16:9 box the
    viewport would hold, which pillarboxed every window wider than 16:9.
@@ -2089,10 +2148,6 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   font-variant-numeric: tabular-nums;
 }
 
-.tb-btn .moon { font-size: var(--fs-sm); line-height: 1; }
-.tb-btn .tb-icon { font-size: var(--fs-sm); line-height: 1; }
-.tb-btn[aria-pressed='true'] { color: var(--accent); border-color: var(--accent); background: var(--accent-ghost); }
-
 /* ------------------------------------------------------------------
    10. Small screens — the board becomes something you pan
 ------------------------------------------------------------------ */
@@ -2117,12 +2172,15 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   .board-foot { flex-direction: column; align-items: flex-start; gap: var(--sp-1); }
   .hero { min-height: 92svh; }
   .hero-title { line-height: 0.9; }
-  .topbar .right { gap: var(--sp-2); }
-  #sound-label, .tb-label { display: none; }
-  /* the clock is the widest thing in the right cluster and the least
-     load-bearing — without it the two icon buttons sit inside the
-     gutter instead of spilling off the edge */
+  /* portrait cover-crops the picture hard; centre the subject rather
+     than favouring the desktop framing, which pushed it off one side */
+  .hero-back, .hero-fore { object-position: 50% 42%; }
+  /* the clock is the widest thing in the corner cluster and the least
+     load-bearing — dropping it leaves just the three glyphs */
   #clock { display: none; }
+  /* the controls sit tighter to the corner on a phone */
+  #controls { padding: var(--sp-2) var(--sp-4); }
+  .ctl { width: 34px; height: 34px; }
 
   /* --- arrival detail, narrow ------------------------------------- */
   /* The top row put the back button and the service ref on one line
