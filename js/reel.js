@@ -316,7 +316,7 @@ const onTilt = (e) => {
 };
 let tiltOn = false;
 function enableTilt() {
-  if (tiltOn || REDUCED) return;
+  if (tiltOn) return;
   baseG = baseB = null;                  // recalibrate to this hold
 
   if (!window.DeviceOrientationEvent || !matchMedia('(pointer: coarse)').matches) return;
@@ -455,12 +455,13 @@ export function showReel(a) {
   document.documentElement.style.overflow = 'hidden';
 
   P.x = P.y = P.tx = P.ty = 0;
-  if (!REDUCED) {
-    stage.addEventListener('pointermove', onMove);
-    stage.addEventListener('pointerleave', onLeave);
-    enableTilt();                        // a phone drives the same parallax by tilting
-    if (!raf) raf = requestAnimationFrame(frame);
-  }
+  /* The parallax answers a direct gesture — a pointer, a drag, a tilt —
+     so it runs even under reduced-motion, which is meant to suppress
+     autoplay motion, not a response the visitor is actively driving. */
+  stage.addEventListener('pointermove', onMove);
+  stage.addEventListener('pointerleave', onLeave);
+  enableTilt();                          // a phone drives the same parallax by tilting
+  if (!raf) raf = requestAnimationFrame(frame);
   document.getElementById('reel-back').focus({ preventScroll: true });
   return true;
 }

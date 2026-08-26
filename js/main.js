@@ -614,7 +614,8 @@ const wpTilt = (e) => {
   gl.pointer(wpClamp((e.gamma - wpBaseG) / 16), wpClamp((e.beta - wpBaseB) / 16));
 };
 function worldParallaxOn() {
-  if (wpOn || !gl.ok || REDUCED) return;
+  // runs even with animations off: it answers a gesture, it is not autoplay
+  if (wpOn || !gl.ok) return;
   wpOn = true;
   wpBaseG = wpBaseB = null;                     // recalibrate to this hold
   addEventListener('pointermove', wpMove, { passive: true });
