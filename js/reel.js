@@ -495,11 +495,15 @@ export function hideReel() {
 
 export function reelOpen() { return !!panel && panel.classList.contains('open'); }
 
-/* Nothing decodes in a tab nobody is looking at. */
+/* The destination music rides through a screen-off. While a service is
+   open its bed is deliberately NOT paused when the tab is hidden, so it
+   keeps playing with the screen dark — the whole point is to fall asleep
+   to it. Everything else still stands down: the station ambience and
+   cues are suspended in main.js, and the video (muted anyway) is paused
+   here to save power. On return, nudge the bed in case the OS paused it. */
 document.addEventListener('visibilitychange', () => {
-  if (music && reelOpen()) {
-    if (document.hidden) music.pause();
-    else if (soundOn()) music.play().catch(() => {});
+  if (music && reelOpen() && !document.hidden && soundOn()) {
+    music.play().catch(() => {});
   }
   if (!cur || cur.tagName !== 'VIDEO') return;
   if (document.hidden) cur.pause();
