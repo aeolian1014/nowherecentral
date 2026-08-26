@@ -56,3 +56,6 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# local self-signed dev certs — machine-specific, never shipped
+certs/

@@ -842,6 +842,9 @@ body.night #controls { opacity: 0; pointer-events: none; }
   display: none;
 }
 .reel-body, .arr-stagger { max-width: 34ch; }
+/* a finger drag on these surfaces feeds the parallax rather than being
+   taken as a scroll or zoom gesture — taps still register */
+.reel-stage, #arrival { touch-action: none; }
 /* the back control loses its word — the arrow is enough over a picture */
 .arr-back span:last-child { display: none; }
 .arr-back { padding: 8px 12px; }

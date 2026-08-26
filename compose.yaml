@@ -1,5 +1,7 @@
 # ------------------------------------------------------------------
-# `docker compose up` → http://localhost:4173
+# `docker compose up`
+#   http://localhost:4173         — on this machine
+#   https://<lan-ip>:4443         — on a phone (the gyroscope needs HTTPS)
 #
 # The source is bind-mounted read-only over what the image already
 # holds, so editing css/ or js/ on the host shows up on the next reload
@@ -7,7 +9,9 @@
 # refresh is enough — there is no cache to bust.
 #
 # Editing server.js itself is the one exception: that needs
-# `docker compose restart`, because Node has already read it.
+# `docker compose restart`, because Node has already read it. The certs/
+# mount is what turns the HTTPS side on; without it the server still
+# serves HTTP only.
 # ------------------------------------------------------------------
 services:
   site:
@@ -15,10 +19,12 @@ services:
     container_name: nowhere-central
     ports:
       - "4173:4173"
+      - "4443:4443"
     volumes:
       - ./index.html:/app/index.html:ro
       - ./css:/app/css:ro
       - ./js:/app/js:ro
       - ./assets:/app/assets:ro
       - ./server.js:/app/server.js:ro
+      - ./certs:/app/certs:ro
     restart: unless-stopped
