@@ -417,11 +417,12 @@ html.boot-lock body {
   align-items: center;
   color: var(--accent);
 }
-.topbar .brand .glyph svg { width: 18px; height: 18px; display: block; }
+/* slim and tall, not wide; centred on the wordmark's cap height */
+.topbar .brand .glyph svg { height: 15px; width: auto; display: block; }
 .topbar .brand .glyph svg path {
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.6;
+  stroke-width: 3.1;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -2003,7 +2004,9 @@ body.dim-2 #nightclock { opacity: 1; }
 
 #night {
   position: fixed;
-  z-index: 47;
+  /* above the destination surfaces (z-50) so night service can be
+     opened and driven from inside a world, not just the concourse */
+  z-index: 55;
   top: 0;
   right: 0;
   bottom: 0;
