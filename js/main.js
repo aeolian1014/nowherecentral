@@ -593,6 +593,48 @@ async function returnHome() {
   announce('You are back at Nowhere Central. Nothing was recorded.');
 }
 
+/* ------------------------------------------------------------------
+   World parallax
+
+   The destination worlds are a GLSL sky that reads uMouse (~-1..1) to
+   swing the camera. Nothing fed it, so they sat dead still. Now, while
+   a world is open, the pointer drives it on a desktop — and on a phone,
+   both a finger drag (pointer events cover touch) and the gyroscope do,
+   the tilt calibrated to whatever angle the phone is first held at.
+   Only while a world is up: the home concourse is deliberately still.
+------------------------------------------------------------------ */
+let wpOn = false, wpBaseG = null, wpBaseB = null;
+const wpClamp = (v) => (v < -1 ? -1 : v > 1 ? 1 : v);
+const wpMove = (e) => {
+  gl.pointer((e.clientX / innerWidth - 0.5) * 2, (e.clientY / innerHeight - 0.5) * 2);
+};
+const wpTilt = (e) => {
+  if (e.gamma == null || e.beta == null) return;
+  if (wpBaseG === null) { wpBaseG = e.gamma; wpBaseB = e.beta; }
+  gl.pointer(wpClamp((e.gamma - wpBaseG) / 16), wpClamp((e.beta - wpBaseB) / 16));
+};
+function worldParallaxOn() {
+  if (wpOn || !gl.ok || REDUCED) return;
+  wpOn = true;
+  wpBaseG = wpBaseB = null;                     // recalibrate to this hold
+  addEventListener('pointermove', wpMove, { passive: true });
+  if (window.DeviceOrientationEvent && matchMedia('(pointer: coarse)').matches) {
+    const add = () => addEventListener('deviceorientation', wpTilt);
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then((s) => { if (s === 'granted') add(); }).catch(() => {});
+    } else {
+      add();
+    }
+  }
+}
+function worldParallaxOff() {
+  if (!wpOn) return;
+  wpOn = false;
+  removeEventListener('pointermove', wpMove);
+  removeEventListener('deviceorientation', wpTilt);
+  gl.pointer(0, 0);                             // let the sky settle back to centre
+}
+
 function openArrival(d) {
   const arr = $('#arrival');
   $('#arr-code').textContent = `${d.code} · SERVICE ${String(DESTINATIONS.indexOf(d) + 1).padStart(2, '0')}`;
@@ -637,6 +679,7 @@ function openArrival(d) {
   $('#concourse').inert = true;
   $('#topbar').inert = true;
   document.documentElement.style.overflow = 'hidden';
+  worldParallaxOn();                            // sky follows pointer + tilt
   $('#arr-back').focus({ preventScroll: true });
 }
 
@@ -649,6 +692,7 @@ function closeArrival() {
   $('#concourse').inert = false;
   $('#topbar').inert = false;
   document.documentElement.style.overflow = '';
+  worldParallaxOff();
 }
 
 /* ================================================================
