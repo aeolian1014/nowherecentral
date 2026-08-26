@@ -275,7 +275,7 @@ function frame() {
   P.y += dy * 0.06;
   if (cur) {
     cur.style.transform =
-      `scale(1.08) translate3d(${(-P.x * 1.6).toFixed(3)}%, ${(-P.y * 1.6).toFixed(3)}%, 0)`;
+      `scale(1.12) translate3d(${(-P.x * 2.6).toFixed(3)}%, ${(-P.y * 2.6).toFixed(3)}%, 0)`;
   }
   /* Once it has caught the pointer there is nothing left to animate.
      Park rather than burn a frame a tick on a picture that is not moving;
@@ -299,16 +299,26 @@ const onLeave = () => { P.tx = 0; P.ty = 0; wake(); };
    beta the front/back; beta is measured against a ~45° hold so the
    picture sits still when the phone is held at a natural reading
    angle. Both are clamped so a hard tilt does not fling the image. */
-const clampT = (v) => (v < -1 ? -1 : v > 1 ? 1 : v);
+/* The first reading after a page opens is taken as the hold angle —
+   whatever way the phone is being held becomes centre — so tilting off
+   it in any direction moves the frame, and you are not fighting a fixed
+   45° assumption. Sensitivity is high (a ~13° lean reaches the edge)
+   and the throw is wide, because a phone tilt is a small gesture and
+   the parallax has to be felt, not hunted for. */
+let baseG = null, baseB = null;
+const clampT = (v) => (v < -2 ? -2 : v > 2 ? 2 : v);
 const onTilt = (e) => {
   if (e.gamma == null || e.beta == null) return;
-  P.tx = clampT(e.gamma / 22);
-  P.ty = clampT((e.beta - 45) / 22);
+  if (baseG === null) { baseG = e.gamma; baseB = e.beta; }
+  P.tx = clampT((e.gamma - baseG) / 13);
+  P.ty = clampT((e.beta - baseB) / 13);
   wake();
 };
 let tiltOn = false;
 function enableTilt() {
   if (tiltOn || REDUCED) return;
+  baseG = baseB = null;                  // recalibrate to this hold
+
   if (!window.DeviceOrientationEvent || !matchMedia('(pointer: coarse)').matches) return;
   const add = () => { window.addEventListener('deviceorientation', onTilt); tiltOn = true; };
   // iOS needs an explicit grant; Android just fires the event
