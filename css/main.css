@@ -1400,6 +1400,7 @@ body.night #controls { opacity: 0; pointer-events: none; }
   color: var(--text-dim);
 }
 .site-foot a:hover { color: var(--accent); }
+.site-foot strong { color: var(--accent); font-weight: 400; }
 
 /* ------------------------------------------------------------------
    7. Arrival
