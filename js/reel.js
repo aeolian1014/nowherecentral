@@ -292,6 +292,38 @@ const onMove = (e) => {
 };
 const onLeave = () => { P.tx = 0; P.ty = 0; wake(); };
 
+/* ---- device tilt -------------------------------------------------
+   A phone has no pointer to follow, so the same parallax rides the
+   gyroscope instead: tilt left/right and the frame slides, exactly as
+   a mouse would move it on a desktop. gamma is the left/right lean,
+   beta the front/back; beta is measured against a ~45° hold so the
+   picture sits still when the phone is held at a natural reading
+   angle. Both are clamped so a hard tilt does not fling the image. */
+const clampT = (v) => (v < -1 ? -1 : v > 1 ? 1 : v);
+const onTilt = (e) => {
+  if (e.gamma == null || e.beta == null) return;
+  P.tx = clampT(e.gamma / 22);
+  P.ty = clampT((e.beta - 45) / 22);
+  wake();
+};
+let tiltOn = false;
+function enableTilt() {
+  if (tiltOn || REDUCED) return;
+  if (!window.DeviceOrientationEvent || !matchMedia('(pointer: coarse)').matches) return;
+  const add = () => { window.addEventListener('deviceorientation', onTilt); tiltOn = true; };
+  // iOS needs an explicit grant; Android just fires the event
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then((s) => { if (s === 'granted') add(); }).catch(() => {});
+  } else {
+    add();
+  }
+}
+function disableTilt() {
+  if (!tiltOn) return;
+  window.removeEventListener('deviceorientation', onTilt);
+  tiltOn = false;
+}
+
 export function initReel({ list = [], onSelect = null, onBack = null,
                            isSoundOn = null, onDuck = null,
                            onSay = null, onCancelSpeech = null, isHd = null,
@@ -416,6 +448,7 @@ export function showReel(a) {
   if (!REDUCED) {
     stage.addEventListener('pointermove', onMove);
     stage.addEventListener('pointerleave', onLeave);
+    enableTilt();                        // a phone drives the same parallax by tilting
     if (!raf) raf = requestAnimationFrame(frame);
   }
   document.getElementById('reel-back').focus({ preventScroll: true });
@@ -434,6 +467,7 @@ export function hideReel() {
 
   stage.removeEventListener('pointermove', onMove);
   stage.removeEventListener('pointerleave', onLeave);
+  disableTilt();
   cancelAnimationFrame(raf); raf = 0;
   stopMusic();
   stopCues();

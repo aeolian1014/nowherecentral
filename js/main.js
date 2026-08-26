@@ -312,6 +312,7 @@ async function arrive_at(id) {
   const a = entry.a;
   inTransit = true;
   currentArrival = a;
+  pushOverlayState();                            // so Back returns to the board
 
   station.enable();
   station.stopTrain();                           // a pass in flight does not follow you
@@ -512,6 +513,7 @@ async function depart_to(id) {
   const d = entry.d;
   inTransit = true;
   currentDest = d;
+  pushOverlayState();                            // so Back returns to the board
 
   station.enable();
   station.stopTrain();                           // a pass in flight does not follow you
@@ -850,6 +852,7 @@ async function openQuiet(item) {
   quietOpen = true;
   quietItem = item;
   inTransit = true;
+  pushOverlayState();                            // Back closes it
 
   $('#q-ref').textContent = item.ref;
   $('#q-title').textContent = scene.title;
@@ -946,7 +949,7 @@ function quietWatch() {
 }
 
 function quietWiring() {
-  $('#q-back').addEventListener('click', closeQuiet);
+  $('#q-back').addEventListener('click', dismissOverlay);
   $('#q-next').addEventListener('click', nextQuiet);
   $('#q-leave').addEventListener('click', () => quietItem && openCounter(quietItem));
   quietWatch();
@@ -973,6 +976,7 @@ function openCounter(item) {
   el.inert = false;
   document.documentElement.style.overflow = 'hidden';
   counterOpen = true;
+  pushOverlayState();                            // Back closes the counter
   station.chime();
   setTimeout(() => ta.focus(), 260);
 }
@@ -1021,7 +1025,7 @@ function counterWiring() {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handItIn();
   });
   $('#ctr-hand').addEventListener('click', handItIn);
-  $('#ctr-close').addEventListener('click', closeCounter);
+  $('#ctr-close').addEventListener('click', dismissOverlay);
   $('#counter').addEventListener('click', (e) => {
     if (e.target === $('#counter')) closeCounter();
   });
@@ -1359,17 +1363,42 @@ function trainWatch() {
 /* ================================================================
    Wiring
    ================================================================ */
+/* ================================================================
+   Back button
+
+   Every overlay — a destination world, an arrival, the counter, the
+   quiet room — is shown by script with no URL change, so the phone's
+   Back button used to walk straight off the site. Opening one pushes a
+   single history entry; Back (hardware, browser, or on-screen) pops it
+   and popstate closes whatever is open. The app only ever has one
+   overlay up at once, so one entry suffices and moving between services
+   does not stack more.
+   ================================================================ */
+function overlayOpen() {
+  return reelOpen() || !!currentDest || counterOpen || quietOpen;
+}
+function closeCurrentOverlay() {
+  if (reelOpen()) return leaveArrival();
+  if (currentDest) return returnHome();
+  if (counterOpen) return closeCounter();
+  if (quietOpen) return closeQuiet();
+}
+function pushOverlayState() {
+  if (!(history.state && history.state.nc)) history.pushState({ nc: 1 }, '');
+}
+/* On-screen closes go through history too, so the stack stays balanced
+   with the hardware button — one entry per open, one pop per close. */
+function dismissOverlay() {
+  if (history.state && history.state.nc) history.back();
+  else closeCurrentOverlay();
+}
+addEventListener('popstate', () => { if (overlayOpen()) closeCurrentOverlay(); });
+
 function keys() {
   addEventListener('keydown', (e) => {
     // letter shortcuts must not fire while she is writing on the slip
     const typing = /^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '');
-    if (e.key === 'Escape') {
-      if (reelOpen()) { leaveArrival(); return; }
-      if (counterOpen) { closeCounter(); return; }
-      if (quietOpen) { closeQuiet(); return; }
-      if (currentDest) returnHome();
-      return;
-    }
+    if (e.key === 'Escape') { dismissOverlay(); return; }
     // Enter/Space only enters once the boot has finished — before that
     // the same press is what begins the boot, and must not skip it
     if (!entered && $('#boot-cta').classList.contains('in') && (e.key === 'Enter' || e.key === ' ')) {
@@ -1444,7 +1473,7 @@ function init() {
 
   $('#boot-cta').addEventListener('click', enterStation);
   $('#quality-btn').addEventListener('click', cycleQuality);
-  $('#arr-back').addEventListener('click', returnHome);
+  $('#arr-back').addEventListener('click', dismissOverlay);
   $('#sound-btn').addEventListener('click', () => {
     station.toggle();
     if (!station.enabled) announcer.cancel();
@@ -1491,7 +1520,7 @@ function init() {
   initReel({
     list: ARRIVALS,
     onSelect: (id) => { leaveArrival().then(() => setTimeout(() => arrive_at(id), 160)); },
-    onBack: () => leaveArrival(),
+    onBack: () => dismissOverlay(),
     isSoundOn: () => station.enabled,
     onDuck: (v, t) => station.duck(v, t),
     /* Deliberately NOT speak(): that routes through the tannoy rig, and
