@@ -1326,17 +1326,6 @@ function nightWiring() {
   $('#night-btn').addEventListener('click', () => toggleNight());
   $('#night-close').addEventListener('click', () => toggleNight(false));
 
-  const vol = $('#vol');
-  const out = $('#vol-out');
-  vol.value = String(Math.round(station.volume * 100));
-  out.value = vol.value;
-  vol.addEventListener('input', () => {
-    out.value = vol.value;
-    station.enable();
-    station.setVolume(+vol.value / 100);
-    updateSoundBtn();
-  });
-
   $$('#timer-chips button').forEach((b) =>
     b.addEventListener('click', () => {
       setTimer(+b.dataset.min);

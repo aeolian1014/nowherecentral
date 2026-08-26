@@ -2106,51 +2106,6 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   color: var(--text-dim);
 }
 
-/* A rotated wrapper rather than writing-mode on the input: vertical
-   range support is still uneven, and this behaves identically everywhere. */
-.vol-wrap {
-  position: relative;
-  width: 26px;
-  height: 150px;
-}
-/* Absolute + explicit centring: a grid item wider than its area does
-   not centre reliably, and this one is 150px inside 26px. */
-#vol {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 150px;
-  transform: translate(-50%, -50%) rotate(-90deg);
-  -webkit-appearance: none;
-  appearance: none;
-  height: 2px;
-  background: var(--border-strong);
-  border-radius: var(--r-full);
-  cursor: none;
-}
-#vol::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px rgba(255, 179, 71, 0.5);
-  cursor: none;
-}
-#vol::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--accent);
-}
-#vol-out {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2xs);
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-
 .chips { display: flex; flex-direction: column; gap: 4px; width: 100%; }
 .chips button {
   padding: 6px 0;
@@ -2233,8 +2188,6 @@ body.dim-1 #night, body.dim-2 #night { opacity: 0; visibility: hidden; }
   body.night .topbar { padding-right: calc(var(--gutter) + 74px); }
   .nr-block { width: 46px; }
   .nr-inner { gap: var(--sp-4); }
-  .vol-wrap { height: 108px; }
-  #vol { width: 108px; }
   #nightclock { inset: auto auto var(--sp-8) var(--sp-4); }
   .arr-inner { padding-top: var(--sp-7); }
   .arr-foot { flex-direction: column; align-items: flex-start; }
