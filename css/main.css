@@ -37,6 +37,26 @@ ul, ol { padding: 0; list-style: none; }
 a { color: inherit; text-decoration: none; cursor: none; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: none; }
 
+/* ------------------------------------------------------------------
+   Scrollbar — dressed to match the station, not the OS
+
+   A slim rail on a near-black track, a muted bar that warms to the
+   sodium accent when grabbed. Firefox reads the two-value form; the
+   ::-webkit- rules paint the same thing in Chrome and Safari. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-600) var(--ink-950);
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-950); }
+::-webkit-scrollbar-thumb {
+  background: var(--ink-600);
+  border-radius: var(--r-full);
+  border: 2px solid var(--ink-950);   /* insets the bar off the track edges */
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar-corner { background: var(--ink-950); }
+
 ::selection { background: var(--accent); color: var(--ink-1000); }
 
 /* Every use of the display serif shares one weight. Playfair carries a
@@ -391,14 +411,20 @@ html.boot-lock body {
   color: var(--text);
   letter-spacing: var(--tracking-wider);
 }
+/* the N monogram — the logo mark, in the sodium accent */
 .topbar .brand .glyph {
-  font-size: var(--fs-sm);
+  display: inline-flex;
+  align-items: center;
   color: var(--accent);
-  letter-spacing: 0;
-  /* a slow turn, so the mark is alive without asking to be watched */
-  animation: brandturn 24s linear infinite;
 }
-@keyframes brandturn { to { transform: rotate(360deg); } }
+.topbar .brand .glyph svg { width: 18px; height: 18px; display: block; }
+.topbar .brand .glyph svg path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* --- nav: the underline is the only decoration ------------------- */
 /* Absolutely centred, not grid-centred. `1fr auto 1fr` looks like it
@@ -845,9 +871,6 @@ body.night #controls { opacity: 0; pointer-events: none; }
 /* a finger drag on these surfaces feeds the parallax rather than being
    taken as a scroll or zoom gesture — taps still register */
 .reel-stage, #arrival { touch-action: none; }
-/* the back control loses its word — the arrow is enough over a picture */
-.arr-back span:last-child { display: none; }
-.arr-back { padding: 8px 12px; }
 
 /* Full bleed. An earlier version locked this to the largest 16:9 box the
    viewport would hold, which pillarboxed every window wider than 16:9.
