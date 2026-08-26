@@ -97,96 +97,105 @@ void main(){
    it stays dark enough to read type over.
    ================================================================= */
 const CONCOURSE = `
+/* A different language entirely from the fog-and-sodium hall this
+   replaces. That was cinematic realism: volumetric beams, haze, a
+   literal colonnade. Rendered better each pass and still read as a
+   render.
+
+   This is built from two things instead — a deep gradient field, and
+   one piece of exact geometry. The field is slow, cool and organic; the
+   geometry is a perspective rail grid, thin and mathematically precise.
+   The tension between the two is the whole design: nothing soft is
+   sharp, nothing sharp is soft, and the eye reads that contrast as
+   deliberate rather than atmospheric.
+
+   Palette is cool — indigo through teal — with a single warm ember held
+   far off. One warm note in a cold frame does more than a frame made
+   entirely of warm ones. */
+
+/* Domain-warped fbm. Warping the input by another noise field is what
+   turns concentric blobs into something that folds and drifts. */
+float field(vec2 p, float t){
+  float a = fbm(p + vec2(t * 0.6, t * 0.35), 4);
+  float b = fbm(p * 1.7 - vec2(t * 0.4, t * 0.7) + a * 0.75, 3);
+  return sat(a * 0.65 + b * 0.55);
+}
+
 vec3 world(vec2 uv, vec2 st){
-  // scrolling the page walks you further into the hall: the light
-  // rises out of frame and the floor takes over
-  vec2 p = uv + vec2(0.0, uScroll * 0.42);
-  vec3 sodium = vec3(1.0, 0.640, 0.265);
-  vec3 col = vec3(0.0040, 0.0055, 0.0090);
+  vec2 p = uv;
+  float t = uTime * 0.016;
 
-  // far wall, barely lit
-  float wall = smoothstep(-0.80, 0.55, p.y) * pow(1.0 - abs(p.x) * 0.50, 3.0);
-  col += vec3(0.017, 0.024, 0.038) * wall;
+  /* ---- the ground: near black, faintly blue, never flat ---- */
+  vec3 col = mix(vec3(0.0075, 0.0095, 0.0165),
+                 vec3(0.0030, 0.0038, 0.0072),
+                 sat(p.y * 1.1 + 0.55));
 
-  /* --- shafts of light through the clerestory glazing ---
-     Built in a sheared frame so the beams rake down to the right,
-     the way winter sun does through a high window.               */
-  vec2 q = p;
-  q.y += 0.10;
-  vec2 r = rot(-0.62) * (q - vec2(-0.95, 1.10));   // r.x runs across the beams
+  /* ---- the field. Three blooms on their own drifts, so the colour
+     never settles into a gradient you can name. ---- */
+  const vec3 INDIGO = vec3(0.30, 0.20, 0.78);
+  const vec3 TEAL   = vec3(0.10, 0.52, 0.60);
+  const vec3 EMBER  = vec3(1.00, 0.52, 0.20);
 
-  // one noise field, shared by all three beams — the break-up reads the
-  // same and costs a third as much
-  float breakup = 0.62 + 0.38 * fbm(vec2(r.x * 1.2, r.y * 0.45 - uTime * 0.018), 3) * 1.8;
-  float fall = exp(-max(r.y, 0.0) * 0.55);
+  float f1 = field(p * 1.05 + vec2(0.0, uScroll * 0.30), t);
+  float f2 = field(p * 1.55 - vec2(1.7, 0.6 - uScroll * 0.18), t * 1.4);
 
-  float shaft = 0.0;
-  for(int i = 0; i < 3; i++){
-    float fi = float(i);
-    float w = 0.62 + fi * 0.34;
-    float s = sin(r.x * (2.35 + fi * 1.45) + fi * 2.1 + uTime * 0.011);
-    s = pow(smoothstep(0.60, 0.995, s), 1.5);
-    shaft += s * w * breakup * fall;
+  // upper-left mass, the cold one
+  float m1 = pow(sat(1.0 - length((p - vec2(-0.42, 0.30)) * vec2(0.85, 1.30))), 2.2);
+  col += INDIGO * m1 * f1 * 0.46;
+
+  // a teal counterweight, lower right, so the frame is not one-sided
+  float m2 = pow(sat(1.0 - length((p - vec2(0.55, -0.12)) * vec2(0.80, 1.45))), 2.4);
+  col += TEAL * m2 * f2 * 0.40;
+
+  // one warm note, small and far. it is the only warmth in the frame.
+  float m3 = pow(sat(1.0 - length((p - vec2(0.34, 0.40)) * 4.6)), 3.2);
+  col += EMBER * m3 * (0.55 + 0.45 * f1) * 0.26;
+
+  /* ---- the geometry: a rail grid on the floor plane.
+     Depth is the reciprocal of distance below the horizon, so the
+     spacing tightens exactly the way real perspective does, and the
+     lines stay hairline-thin at every depth rather than fattening as
+     they approach. Scrolling drives the grid toward you. ---- */
+  /* Off-centre and very slightly tilted. A level horizon through the
+     middle of the frame is the one composition guaranteed to read as
+     default rather than chosen. */
+  float HZ = 0.235 + p.x * 0.022;
+  if(p.y < HZ - 0.002){
+    float z  = 0.62 / (HZ - p.y);
+    float wx = p.x * z;
+    float haze = exp(-z * 0.085);
+
+    // rails
+    float rail = abs(fract(wx * 0.42 + 0.5) - 0.5) / 0.42;
+    float rw   = 0.0016 * z + 0.0009;
+    float rg   = smoothstep(rw, 0.0, rail);
+
+    // sleepers, moving with the scroll
+    float run = z + uScroll * 7.0 + uTime * 0.045;
+    float tie = abs(fract(run * 0.30 + 0.5) - 0.5) / 0.30;
+    float tg  = smoothstep(0.020, 0.0, tie) * 0.22;
+
+    vec3 line = mix(TEAL, INDIGO, sat(z * 0.05));
+    col += line * (rg + tg) * haze * 0.085;   // a trace, not the subject
+
+    // the plane itself, catching a little of the field
+    col += mix(INDIGO, TEAL, 0.5) * haze * 0.030 * (0.4 + 0.6 * f2);
   }
-  shaft *= smoothstep(-1.15, 0.55, p.y - p.x * 0.30);
-  shaft = sat(shaft);
 
-  col += sodium * shaft * 0.155;
+  /* ---- the horizon: a single hairline, the sharpest thing here ---- */
+  col += mix(TEAL, vec3(1.0), 0.30) * smoothstep(0.0022, 0.0, abs(p.y - HZ)) * 0.085;
+  col += TEAL * exp(-abs(p.y - HZ) * 30.0) * 0.030;
 
-  // the source, out of frame top-left
-  float dl = length(p - vec2(-0.78 + uMouse.x * 0.02, 0.92 + uMouse.y * 0.015));
-  col += sodium * exp(-dl * 2.6) * 0.085;
+  /* ---- something crosses, far off, every twenty-two seconds ---- */
+  float cyc  = fract(uTime * 0.0455);
+  float sx   = mix(-1.9, 1.9, cyc);
+  float gate = smoothstep(0.0, 0.12, cyc) * smoothstep(1.0, 0.88, cyc);
+  col += vec3(0.70, 0.82, 1.00)
+       * exp(-abs(p.x - sx) * 7.0) * exp(-abs(p.y - HZ) * 34.0) * gate * 0.30;
 
-  // a colder lamp far right, for depth
-  col += vec3(0.34, 0.52, 0.68) * exp(-length(p - vec2(1.02, 0.55)) * 5.2) * 0.075;
-
-  // suspended dust — small, and only where a beam can catch it.
-  // Skipped outright where no beam reaches; most of the frame is dark.
-  float lit = sat(shaft * 2.2);
-  if(lit > 0.01){
-    float dust = 0.0;
-    for(int i = 0; i < 2; i++){
-      float fi = float(i);
-      vec2 gp = p * (16.0 + fi * 15.0) + vec2(uTime * (0.016 + fi * 0.010), -uTime * 0.011 + fi * 7.3);
-      vec2 id = floor(gp);
-      vec2 f  = fract(gp) - 0.5;
-      vec2 o  = hash22(id + fi * 19.3) - 0.5;
-      float m = smoothstep(0.030, 0.002, length(f - o * 0.8));
-      dust += m * step(0.55, hash21(id + fi * 3.7)) * (0.35 + 0.65 * hash21(id + fi * 11.0));
-    }
-    col += sodium * dust * 0.50 * lit;
-  }
-
-  // polished floor: a smeared mirror of the shafts
-  float floorMask = smoothstep(-0.26, -0.60, p.y);
-  if(floorMask > 0.005){
-    vec2 rp = vec2(p.x + 0.06, -0.58 - p.y);
-    vec2 r2 = rot(-0.62) * (vec2(rp.x, rp.y + 0.10) - vec2(-0.95, 1.10));
-    float mirror = smoothstep(0.60, 1.0, sin(r2.x * 2.05 + uTime * 0.011)) * exp(-max(r2.y, 0.0) * 0.7);
-    mirror *= 0.4 + 0.6 * fbm(vec2(p.x * 3.0, p.y * 9.0 + uTime * 0.05), 2);
-    col += sodium * mirror * floorMask * 0.055;
-  }
-  col += vec3(0.020, 0.028, 0.042) * floorMask * 0.5;
-
-  // seam where the floor meets the wall
-  col += sodium * smoothstep(0.020, 0.0, abs(p.y + 0.26)) * 0.030;
-
-  /* Every twenty-odd seconds something passes the platform. You never
-     see the train, only its windows strobing across the floor.        */
-  float cyc = fract(uTime * 0.0455);
-  float sweepX = mix(-2.4, 2.4, cyc);
-  float gate = smoothstep(0.0, 0.10, cyc) * smoothstep(1.0, 0.90, cyc);
-  float strobe = 0.55 + 0.45 * sin((p.x - sweepX) * 46.0);
-  float sw = exp(-abs(p.x - sweepX) * 1.9) * smoothstep(0.02, -0.62, p.y) * strobe;
-  col += vec3(0.72, 0.84, 1.0) * sw * gate * 0.085;
-  col += sodium * exp(-abs(p.x - sweepX) * 3.4) * gate * smoothstep(-0.40, -0.10, p.y) * 0.025;
-
-  col *= 0.95 + 0.05 * sin(uTime * 0.29);
-
-  // the reading scrim: this world sits behind a whole document, so it
-  // carries its own contrast floor rather than a composited overlay
-  vec2 d2 = (st - vec2(0.5, 0.55)) * vec2(1.05, 1.25);
-  col *= 1.0 - smoothstep(0.22, 0.72, length(d2)) * 0.55;
+  /* ---- grade: lift nothing, crush the toe, keep type readable ---- */
+  col = col / (1.0 + col * 0.42);
+  col *= 1.0 - smoothstep(0.30, 1.05, length((st - vec2(0.5, 0.52)) * vec2(1.02, 1.20))) * 0.60;
   return col;
 }
 `;
