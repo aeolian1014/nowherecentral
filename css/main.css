@@ -1180,8 +1180,8 @@ body.night #controls { opacity: 0; pointer-events: none; }
 .flapline[data-role='status'] .cell {
   color: var(--petrol-300);
   font-size: calc(var(--flap-h) * 0.52);
-  /* a very slight glow, so the status reads lit rather than painted */
-  text-shadow: 0 0 5px rgba(139, 217, 231, 0.4);
+  /* just a whisper of glow — the colour carries it, like the time does */
+  text-shadow: 0 0 3px rgba(52, 210, 230, 0.3);
 }
 
 /* ------------------------------------------------------------------
