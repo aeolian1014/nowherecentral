@@ -1177,7 +1177,12 @@ body.night #controls { opacity: 0; pointer-events: none; }
 .flapline[data-role='dest'] .cell { color: var(--bone-100); }
 .flapline[data-role='time'] .cell { color: var(--accent); }
 .flapline[data-role='plat'] .cell { color: var(--bone-200); }
-.flapline[data-role='status'] .cell { color: var(--petrol-400); font-size: calc(var(--flap-h) * 0.52); }
+.flapline[data-role='status'] .cell {
+  color: var(--petrol-300);
+  font-size: calc(var(--flap-h) * 0.52);
+  /* a very slight glow, so the status reads lit rather than painted */
+  text-shadow: 0 0 5px rgba(139, 217, 231, 0.4);
+}
 
 /* ------------------------------------------------------------------
    6. Editorial sections

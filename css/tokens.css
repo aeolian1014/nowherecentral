@@ -26,6 +26,7 @@
   --signal-green: #6fe3a0;
   --signal-red: #ff5b53;
   --petrol-400: #4fa8b8;
+  --petrol-300: #8bd9e7; /* brighter teal — lit board status */
 
   /* ---- semantic roles -------------------------------------------- */
   --bg: var(--ink-1000);
