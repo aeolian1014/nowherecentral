@@ -1,0 +1,20 @@
+# Netlify caching. Netlify serves this site statically (server.js does
+# not run there), so these headers decide how long a browser holds on.
+
+# Media and fonts — the heavy, stable files. A visitor downloads a
+# video or a bed once and keeps it for a year; "immutable" tells the
+# browser not to even ask again. Note: because the filenames are not
+# content-hashed, if you ever replace a file under assets/ keep the
+# same name only if the content is the same — otherwise rename it, or
+# some visitors will keep the old one until they clear their cache.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Code and markup are tiny and change when the site is updated, so they
+# are cached briefly and then revalidated — updates show within minutes.
+/css/*
+  Cache-Control: public, max-age=600, must-revalidate
+/js/*
+  Cache-Control: public, max-age=600, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
