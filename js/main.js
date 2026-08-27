@@ -61,7 +61,7 @@ if (!gl.ok) document.body.classList.add('no-gl');
    Boot sequence
    ================================================================ */
 const BOOT_LINES = [
-  ['SYS ', 'terminal authority · node 7', 220],
+  ['SYS ', 'nowhere central · night terminal', 220],
   ['NET ', 'uplink established — <b>latency 0 ms</b>', 260],
   ['CLK ', 'station clock synchronised', 200],
   ['BRD ', 'departure board — <b>6 services listed</b>', 300],
